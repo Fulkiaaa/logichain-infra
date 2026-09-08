@@ -6,7 +6,9 @@
 # sans le mot de passe du vault, cette étape échouerait sur un fichier
 # illisible avant même d'avoir pu vérifier quoi que ce soit. Le secret
 # ANSIBLE_VAULT_PASSWORD (le même que celui utilisé par cd.yml) est donc
-# fourni à ce job également.
+# fourni à ce job également — et écrit AVANT ansible-lint : ce dernier invoque
+# lui-même `ansible-playbook --syntax-check` sur chaque rôle et sur site.yml,
+# et échoue à son tour sans le mot de passe du vault (constaté à l'exécution).
 ---
 name: ci
 on:
@@ -29,15 +31,15 @@ jobs:
       - run: pip install ansible ansible-lint yamllint
       - run: ansible-galaxy collection install -r requirements.yml
 
+      - name: Écrire le mot de passe du vault
+        run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault-pass
+      - run: chmod 600 .vault-pass
+
       - name: yamllint
         run: yamllint .
 
       - name: ansible-lint
         run: ansible-lint
-
-      - name: Écrire le mot de passe du vault
-        run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault-pass
-      - run: chmod 600 .vault-pass
 
       - name: Vérification de syntaxe
         run: ansible-playbook site.yml -i inventories/ci --syntax-check
