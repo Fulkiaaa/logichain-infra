@@ -1,0 +1,22 @@
+---
+# `chdir` sur les deux commandes ci-dessous : PM2 daemonise en détachant un
+# processus Node dont le `cwd` est hérité du process appelant. Si ce `cwd`
+# n'est pas accessible à app_user (répertoire personnel de l'utilisateur de
+# connexion, tmp Ansible d'un autre utilisateur, etc.), le spawn du daemon
+# échoue silencieusement en « spawn /usr/bin/node EACCES » — constaté en
+# reproduisant le scénario manuellement sur la cible. {{ app_dir }} appartient
+# à app_user (mode 0750) : toujours accessible, donc un `chdir` sûr.
+- name: Recharger l'application
+  ansible.builtin.command:
+    cmd: "pm2 reload {{ app_name }} --update-env"
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  changed_when: true
+  notify: Enregistrer l'état PM2
+
+- name: Enregistrer l'état PM2
+  ansible.builtin.command:
+    cmd: pm2 save
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  changed_when: true

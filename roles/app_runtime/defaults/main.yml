@@ -1,0 +1,39 @@
+---
+# Interface documentée du rôle : toute variable consommée par tasks/main.yml
+# doit avoir une valeur par défaut, pour que le rôle reste jouable seul.
+# Exception : les vault_* (vault_jwt_secret, vault_mongodb_app_password)
+# n'ont volontairement pas de défaut — le rôle doit échouer explicitement si
+# le vault n'est pas fourni, plutôt que de démarrer l'API avec un secret
+# trivial ou vide.
+
+# --- Identité applicative et dépôt -------------------------------------
+# Répétées ici pour la jouabilité isolée du rôle (voir database/nodejs/web_proxy) ;
+# leur valeur réelle vient de inventories/staging/group_vars/all/vars.yml.
+app_name: logichain-api
+app_user: logichain
+app_group: logichain
+app_dir: /opt/logichain
+app_repo: https://github.com/Fulkiaaa/logichain-api.git
+app_version: main
+app_port: 3000
+
+# --- Configuration applicative (→ templates/env.j2) ---------------------
+# Ces variables correspondent exactement au schéma Zod de src/config/env.ts
+# de l'API (validation au boot, fail-fast) : ne pas renommer sans vérifier
+# ce fichier côté API.
+app_node_env: production
+app_log_level: info
+app_cors_origin: "*"
+app_bcrypt_rounds: 12
+app_jwt_expires_in: 2h
+app_jwt_refresh_expires_in: 7d
+
+# --- MongoDB (côté client, pour construire MONGO_URI) --------------------
+# Répétées depuis le rôle database pour la jouabilité isolée du rôle.
+# authSource = mongodb_database : l'utilisateur applicatif a été créé DANS
+# la base logichain (rôle database), pas dans admin.
+mongodb_bind_ip: 127.0.0.1
+mongodb_port: 27017
+mongodb_database: logichain
+mongodb_replicaset: rs0
+mongodb_app_user: logichain_app

@@ -1,0 +1,159 @@
+---
+# Prérequis pour « become_user » : Ansible doit accorder à l'utilisateur
+# applicatif un accès temporaire aux fichiers de module qu'il dépose sur la
+# cible (répertoire ~/.ansible/tmp du compte de connexion). Sans le paquet
+# `acl` (setfacl), ce transfert de permissions échoue avec
+# « Failed to set permissions on the temporary files… chmod: invalid mode:
+# 'A+user:...' » — constaté en reproduisant le scénario sur la cible, avant
+# même la première tâche `become_user` du rôle (git checkout ci-dessous).
+- name: Installer le paquet acl (requis pour « become_user »)
+  ansible.builtin.apt:
+    name: acl
+    state: present
+
+# Écart documenté par rapport au brief : le brief créait {{ app_dir }} ET
+# {{ app_dir }}/logs avant le git checkout. `git clone` refuse un répertoire
+# de destination non vide (« destination path already exists and is not an
+# empty directory ») — constaté à l'exécution : la présence de logs/ dans
+# {{ app_dir }} fait échouer le checkout initial. {{ app_dir }} seul doit
+# donc être créé (vide) avant le clone ; logs/ est créé juste après, une
+# fois le dépôt en place.
+- name: Créer le répertoire applicatif
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0750"
+
+- name: Récupérer le code source
+  ansible.builtin.git:
+    repo: "{{ app_repo }}"
+    dest: "{{ app_dir }}"
+    version: "{{ app_version }}"
+    force: true
+  become_user: "{{ app_user }}"
+  register: app_checkout
+
+- name: Créer le répertoire des journaux applicatifs
+  ansible.builtin.file:
+    path: "{{ app_dir }}/logs"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0750"
+
+# --- Build ------------------------------------------------------------------
+# Écart documenté par rapport au brief : le brief gardait la compilation
+# TypeScript par `creates: {{ app_dir }}/dist/index.js`. C'est un piège — une
+# fois dist/index.js présent, le build ne rejouerait plus JAMAIS, y compris
+# après une mise à jour du dépôt : le playbook de déploiement applicatif
+# (tâche suivante) livrerait alors indéfiniment l'ancien binaire. La garde
+# est donc portée sur le changement du checkout (app_checkout.changed),
+# complétée par ce `stat` en cas de dist/ disparu entre deux passages
+# (robustesse), plutôt que sur l'existence du fichier compilé.
+- name: Vérifier si le build TypeScript existe déjà
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/dist/index.js"
+  register: app_dist
+
+# Écart documenté par rapport au brief : le brief installait les dépendances
+# deux fois (production, puis complètes) — le second `npm ci` écrasait le
+# premier, qui ne servait donc à rien. Un seul `npm ci` complet (devDependencies
+# incluses, nécessaires pour compiler TypeScript), suivi d'un élagage après
+# le build (voir plus bas), pour livrer malgré tout un node_modules de
+# production comme l'exige le sujet.
+- name: Installer les dépendances (complètes, nécessaires au build)
+  community.general.npm:
+    path: "{{ app_dir }}"
+    ci: true
+  become_user: "{{ app_user }}"
+  when: app_checkout.changed or not app_dist.stat.exists
+
+- name: Compiler TypeScript
+  ansible.builtin.command:
+    cmd: npm run build
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  when: app_checkout.changed or not app_dist.stat.exists
+  changed_when: true
+
+- name: Élaguer les dépendances de développement
+  ansible.builtin.command:
+    cmd: npm prune --omit=dev
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  when: app_checkout.changed or not app_dist.stat.exists
+  changed_when: true
+
+# --- Configuration ------------------------------------------------------
+- name: Déployer le fichier d'environnement
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Recharger l'application
+
+- name: Déployer la configuration PM2
+  ansible.builtin.template:
+    src: ecosystem.config.js.j2
+    dest: "{{ app_dir }}/ecosystem.config.js"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0640"
+  notify: Recharger l'application
+
+# --- PM2 : le seul endroit du projet sans module natif ----------------------
+# Vérifié : aucune collection Ansible ne fournit de module pm2. Le sujet
+# proscrit les commandes « sans gardes » — chacune ci-dessous en porte une
+# (creates:, ou when: combiné à changed_when: explicite). Aucun shell : les
+# commandes PM2 sont invoquées seules ou via des arguments littéraux, jamais
+# de pipe/redirection qui nécessiterait un interpréteur shell.
+#
+# `chdir: {{ app_dir }}` sur chaque commande devenant app_user : PM2
+# daemonise en détachant un processus Node dont le `cwd` est hérité du
+# process appelant. Si ce `cwd` n'est pas accessible à app_user, le spawn du
+# daemon échoue silencieusement en « spawn /usr/bin/node EACCES » — constaté
+# en reproduisant le scénario sur la cible. {{ app_dir }} appartient à
+# app_user (mode 0750) : toujours accessible, donc un `chdir` sûr.
+- name: Lister les processus PM2 connus
+  ansible.builtin.command:
+    cmd: pm2 jlist
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  register: pm2_processes
+  changed_when: false
+
+- name: Démarrer l'application si elle n'est pas déjà gérée par PM2
+  ansible.builtin.command:
+    cmd: pm2 start ecosystem.config.js
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  when: app_name not in (pm2_processes.stdout | from_json | map(attribute='name') | list)
+  changed_when: true
+  notify: Enregistrer l'état PM2
+
+- name: Générer l'unité systemd PM2 (survie au redémarrage)
+  ansible.builtin.command:
+    cmd: "pm2 startup systemd -u {{ app_user }} --hp /home/{{ app_user }}"
+    creates: "/etc/systemd/system/pm2-{{ app_user }}.service"
+
+- name: Activer le service PM2 au démarrage
+  ansible.builtin.service:
+    name: "pm2-{{ app_user }}"
+    enabled: true
+
+- name: Appliquer les handlers en attente avant de vérifier la santé de l'API
+  ansible.builtin.meta: flush_handlers
+
+- name: Attendre que l'API réponde
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ app_port }}/health"
+    status_code: 200
+  register: health
+  until: health.status == 200
+  retries: 12
+  delay: 5

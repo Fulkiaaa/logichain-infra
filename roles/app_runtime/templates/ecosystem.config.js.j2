@@ -1,0 +1,14 @@
+// Géré par Ansible — rôle app_runtime. Ne pas modifier à la main.
+module.exports = {
+  apps: [{
+    name: '{{ app_name }}',
+    script: 'dist/index.js',
+    cwd: '{{ app_dir }}',
+    instances: 1,
+    exec_mode: 'fork',
+    max_memory_restart: '400M',
+    env: { NODE_ENV: '{{ app_node_env }}' },
+    error_file: '{{ app_dir }}/logs/error.log',
+    out_file: '{{ app_dir }}/logs/out.log',
+  }],
+};
