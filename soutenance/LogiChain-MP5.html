@@ -297,7 +297,7 @@ body.plan-on .plan{display:block}
   <div class="notes">
     <h4>Conduite</h4>
     <p>Salue, présente-toi en une phrase. Situe le module : après l'API (MP3) et l'application mobile (MP4), ce troisième volet ne montre presque aucune fonctionnalité nouvelle — il montre que les deux premières sont <b>livrables à une équipe qui n'existe pas encore</b>.</p>
-    <p>Annonce le fil rouge tout de suite : « je ne vais pas vous convaincre en listant des outils. Je vais vous montrer une machine détruite et reconstruite en 1 minute 36, quatre bugs réels que j'ai rencontrés et corrigés, et les limites que j'assume plutôt que de laisser découvrir. »</p>
+    <p>Annonce le fil rouge tout de suite : « je ne vais pas vous convaincre en listant des outils. Je vais vous montrer une machine détruite et reconstruite en 1 minute 38, quatre bugs réels que j'ai rencontrés et corrigés, et les limites que j'assume plutôt que de laisser découvrir. »</p>
   </div>
 </section>
 
@@ -714,7 +714,7 @@ error: failed to push some refs to 'https://github.com/Fulkiaaa/logichain-api.gi
   <div class="notes">
     <h4>Conduite</h4>
     <p>Distingue bien les deux sources d'idempotence : celle qu'on obtient « gratuitement » avec des modules Ansible corrects, et celle qu'il a fallu construire à la main pour PM2. Le jury doit comprendre que ce n'est pas un hasard heureux.</p>
-    <p class="q">Si on demande comment vérifier l'idempotence sans attendre un second passage complet (1 min 36) : ce n'est pas nécessaire de le faire en direct pendant la soutenance — le journal <code>idempotence-2026-09-08.log</code> en est la preuve déjà rejouée, et la CD le revérifie automatiquement à chaque fusion sur <code>main</code> (slide 22).</p>
+    <p class="q">Si on demande comment vérifier l'idempotence sans attendre un second passage complet (1 min 38) : ce n'est pas nécessaire de le faire en direct pendant la soutenance — le journal <code>idempotence-2026-09-08.log</code> en est la preuve déjà rejouée, et la CD le revérifie automatiquement à chaque fusion sur <code>main</code> (slide 22).</p>
   </div>
 </section>
 
@@ -744,16 +744,15 @@ error: failed to push some refs to 'https://github.com/Fulkiaaa/logichain-api.gi
   <p class="lede">La preuve la plus directe qu'il n'y a plus de secret dans une tête : une machine vraiment vierge, un service qui répond, en une commande.</p>
 
 <pre><span class="c">$ multipass launch 24.04 --name logichain-staging --memory 2G --disk 10G --cloud-init cloud-init.yaml</span>
-<span class="c">$ ansible-playbook site.yml -i inventories/staging</span>
-<span class="c"># ... 72 tâches, 5 rôles ...</span>
+<span class="c">$ time ansible-playbook site.yml -i inventories/staging</span>
+<span class="c"># ... 76 tâches, 5 rôles ...</span>
 PLAY RECAP
-logichain-staging          : ok=72   changed=54   unreachable=0    failed=0    skipped=0
+logichain-staging          : ok=76   changed=57   unreachable=0    failed=0    skipped=0
 
-<span class="c">$ script -q /dev/null ansible-playbook site.yml</span>
-script -q /dev/null ansible-playbook site.yml  4.14s user 3.04s system 7% cpu <span class="s">1:36.23</span> total</pre>
+ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu <span class="s">1:38.14</span> total</pre>
 
   <div class="cols c3" style="margin-top:22px">
-    <div class="stat"><span class="n signal">1:36</span><span class="l">reconstruction complète</span></div>
+    <div class="stat"><span class="n signal">1:38</span><span class="l">reconstruction complète</span></div>
     <div class="stat"><span class="n app">200</span><span class="l"><code>/health</code> après coup</span></div>
     <div class="stat"><span class="n ok">401</span><span class="l">login avec des identifiants inexistants</span></div>
   </div>
@@ -815,7 +814,7 @@ script -q /dev/null ansible-playbook site.yml  4.14s user 3.04s system 7% cpu <s
   <div class="notes">
     <h4>Conduite</h4>
     <p>C'est le bug le plus instructif de toute la soutenance : il ne parle pas de code cassé, il parle de <b>hasard</b> — un mot de passe aléatoire qui contient ou non un caractère piège. Assume-le comme un argument en faveur du multi-environnement, pas comme une honte.</p>
-    <p><b>Provisionnement mesuré sur le runner : 4 min 35 s</b> — plus long qu'en local (1 min 36) parce que le runner part encore plus vierge (aucun paquet en cache APT, contrairement à la VM Multipass réutilisée).</p>
+    <p><b>Provisionnement mesuré sur le runner : 4 min 35 s</b> — plus long qu'en local (1 min 38) parce que le runner part encore plus vierge (aucun paquet en cache APT, contrairement à la VM Multipass réutilisée).</p>
     <p class="q">Si on demande « le CD déploie-t-il en production réelle ? » : non, assume-le explicitement — c'est une limite documentée (slide 26). Le runner est une machine vierge de démonstration, plus exigeante qu'un serveur permanent puisque tout est refait à chaque fusion, mais ce n'est pas encore un déploiement en production.</p>
   </div>
 </section>
@@ -878,7 +877,7 @@ script -q /dev/null ansible-playbook site.yml  4.14s user 3.04s system 7% cpu <s
     <ul class="clean">
       <li><b>1. Architecture</b> — schéma de la cible, flux d'une requête</li>
       <li><b>2. Prérequis</b></li>
-      <li><b>3. Reconstruction complète</b> — 1 min 36 s, mesurée</li>
+      <li><b>3. Reconstruction complète</b> — 1 min 38 s, mesurée</li>
       <li><b>4. Déploiement applicatif seul</b> — <code>ok=13 changed=0</code> sans nouveau commit</li>
       <li><b>5. Rollback</b> — mécanisme et son écart connu (slide 26)</li>
     </ul>
@@ -962,7 +961,7 @@ script -q /dev/null ansible-playbook site.yml  4.14s user 3.04s system 7% cpu <s
 
   <div class="cols c2">
     <ul class="clean">
-      <li><b>Provisionnement reproductible</b> : 5 rôles, 3 inventaires, 1 min 36 s d'une VM vierge à un service qui répond</li>
+      <li><b>Provisionnement reproductible</b> : 5 rôles, 3 inventaires, 1 min 38 s d'une VM vierge à un service qui répond</li>
       <li><b>Idempotence garantie</b> : <code>changed=0</code> au second passage, revérifié automatiquement à chaque fusion</li>
       <li><b>Gitflow et protections actives</b> : 6 rulesets, aucun acteur de contournement, push direct rejeté</li>
     </ul>
