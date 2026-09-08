@@ -1,0 +1,24 @@
+---
+app_name: logichain-api
+app_user: logichain
+app_group: logichain
+app_dir: /opt/logichain
+app_repo: https://github.com/Fulkiaaa/logichain-api.git
+app_version: main
+app_port: 3000
+
+mongodb_version: "8.0"
+mongodb_database: logichain
+mongodb_replicaset: rs0
+mongodb_app_user: logichain_app
+mongodb_admin_user: logichain_admin
+
+web_proxy_server_name: logichain.local
+web_proxy_tls_mode: selfsigned
+
+system_security_ufw_enabled: true
+system_security_ufw_allowed_ports: ["22", "80", "443"]
+# Clé publique de l'administrateur système, déposée sur le serveur par un rôle ultérieur.
+# Passe par une variable (et non un lookup en dur dans le rôle) pour pouvoir tourner
+# aussi sur un runner CI qui ne possède pas cette clé.
+system_security_admin_pubkey: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_ed25519.pub') }}"

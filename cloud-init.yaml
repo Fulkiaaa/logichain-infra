@@ -1,0 +1,4 @@
+#cloud-config
+ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINsfEQaQP8m/75h7tKJg5I1fRsuVrrnRvlRGXpvtn+2l key for OVH VPS
+package_update: true
