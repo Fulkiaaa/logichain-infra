@@ -763,7 +763,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
     <h4>Conduite</h4>
     <p>Si le temps le permet, lance réellement <code>multipass launch</code> en direct avant la slide (ça prend le temps de ton intro) et affiche le résultat ici — sinon, la capture réelle suffit, elle est datée et vérifiable.</p>
     <p>Insiste sur la méthode de mesure : la mesure définitive a été prise avec <code>time</code>, dont le total apparaît au pied du journal ci-dessus. La sortie complète est conservée dans <code>soutenance/preuves/</code> comme preuve. Si le jury demande la commande exacte : <code>time ansible-playbook site.yml</code>.</p>
-    <p class="q">Si on demande « avez-vous rejoué cette démonstration récemment ? » : la reconstruction complète depuis une VM détruite n'a pas été rejouée une seconde fois pour ce Runbook — ça aurait détruit l'environnement de démo actif. Ce qui a été revérifié le même jour, sur la VM existante déjà provisionnée : un nouveau passage de <code>site.yml</code> en non-régression, résultat attendu <code>changed=0, failed=0</code> — confirmé.</p>
+    <p class="q">Si on demande « avez-vous rejoué cette démonstration récemment ? » : oui — la reconstruction complète depuis une VM réellement détruite (<code>multipass delete --purge</code>) puis recréée a été rejouée le 2026-09-08, en répétition générale (commit <code>c820729</code>), chronométrée à <b>1 min 38 s</b>. C'est justement la mesure affichée ci-dessus ; les journaux de preuve actuels (<code>soutenance/preuves/rebuild-2026-09-08.log</code>) en attestent.</p>
   </div>
 </section>
 
@@ -810,6 +810,8 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   </div>
 
   <div class="callout bug"><b>Le bug qui n'apparaissait qu'une fois sur deux.</b> Le filtre Jinja2 <code>urlencode</code> ne protège pas le caractère « / » — il le traite comme un séparateur d'URL légitime. Or « / » coupe une URI MongoDB : le pilote refuse la connexion avec <code>MongoParseError: Password contains unescaped characters</code>. Le mot de passe étant généré aléatoirement, le bug n'apparaissait que si ce mot de passe contenait un « / » — environ une fois sur deux. Celui de staging n'en avait pas ; celui du runner CI, si. <b>Sans ce second environnement, le bug serait resté latent.</b> Corrigé par <code>| urlencode | regex_replace('/', '%2F')</code>.</div>
+
+  <div class="callout" style="margin-top:12px"><b>Et les tests d'intégration mobile (<code>npm run parcours</code>) ?</b> Cette suite exige un jeu de données seedé (un compte utilisateur existant) que le playbook Ansible ne pose pas ; la jouer sur une machine tout juste provisionnée produirait un échec sans valeur. Elle n'est donc exécutée par aucun pipeline — elle se lance à la main contre une API déjà peuplée. Ce que la CD vérifie à sa place, ce sont les trois tests de fumée bout-en-bout ci-dessus contre l'API que le playbook vient d'installer, dont le <code>POST /auth/login</code> qui renvoie <b>401</b> au format d'erreur métier : la preuve que MongoDB est réellement interrogé, pas seulement que Node répond.</div>
 
   <div class="notes">
     <h4>Conduite</h4>
@@ -941,7 +943,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   </div>
 
   <ul class="clean" style="margin-top:22px">
-    <li><b>Aucun tag Git sur <code>logichain-api</code></b> : la procédure de rollback (Runbook §5) est donc théorique en l'état — testée avec une branche réelle, jamais avec un SHA arbitraire non exposé comme réf, qui échoue (<code>couldn't find remote ref</code>). Recommandation écrite : tagger chaque release avant la mise en production réelle.</li>
+    <li><b>Aucun inventaire <code>prod</code> réellement éprouvé</b> : la structure à trois inventaires existe (slide 18) et <code>ci</code>/<code>staging</code> sont tous deux joués en vrai, mais <code>prod</code> reste une structure anticipée, jamais instanciée ni provisionnée contre une cible réelle — le VPS mutualisé actuel n'en est pas la destination. Recommandation écrite : instancier <code>prod</code> et rejouer <code>site.yml</code> contre elle avant toute mise en production réelle.</li>
     <li><b>PM2 sans module Ansible</b> : déjà détaillé (slide 16) — chaque commande y est gardée selon sa nature, pas laissée nue.</li>
   </ul>
 
@@ -950,7 +952,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   <div class="notes">
     <h4>Conduite</h4>
     <p>Slide difficile à assumer à l'oral mais nécessaire : ne t'excuse pas, énonce ces points comme des arbitrages avec leur justification prête, exactement comme en MP3 et MP4.</p>
-    <p class="q">Si on demande laquelle de ces limites corriger en premier : les tags Git sur <code>logichain-api</code> — c'est la moins coûteuse (une commande <code>git tag</code> à chaque fusion vers <code>main</code>) et elle débloque un rollback réel, aujourd'hui purement théorique.</p>
+    <p class="q">Si on demande laquelle de ces limites corriger en premier : l'inventaire <code>prod</code> — c'est celle qui bloque le plus directement une mise en production réelle, et rien ne garantit qu'un inventaire jamais joué se comporte comme <code>staging</code> ou <code>ci</code> tant qu'il n'a pas été éprouvé au moins une fois.</p>
   </div>
 </section>
 
@@ -995,7 +997,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
     <p><b>Sigles :</b> CI = intégration continue. CD = déploiement continu. PLAY RECAP = résumé de fin d'exécution Ansible. UFW = pare-feu Ubuntu. rs0 = nom du replica set MongoDB. RBAC (si demandé, hérité du MP4) = contrôle d'accès par rôle.</p>
     <p><b>« Pourquoi ne pas avoir tout testé en conditions réelles (rollback, rotation de secrets) ? »</b> Chacun de ces cas est documenté dans le Runbook avec, explicitement, ce qui a été vérifié à la place (mécanisme lu dans le code, ou testé sur un environnement jetable) — plutôt que de prétendre un test qui aurait risqué de casser l'environnement de démonstration partagé sans bénéfice réel.</p>
     <p><b>« Combien de temps pour qu'une nouvelle personne devienne autonome ? »</b> Pas mesuré formellement — c'est justement l'écart entre ce module et une vraie passation avec un second contributeur. Ce qui est mesuré : chaque commande du Runbook est copiable telle quelle, sans variable à deviner.</p>
-    <p><b>« Le plus gros risque du projet aujourd'hui ? »</b> L'absence de tags Git sur <code>logichain-api</code>, qui rend le rollback théorique — et le fait que <code>required_approving_review_count</code> reste à 0 tant qu'il n'y a qu'une seule personne pour approuver.</p>
+    <p><b>« Le plus gros risque du projet aujourd'hui ? »</b> L'absence d'un inventaire <code>prod</code> réellement éprouvé — seuls <code>staging</code> et <code>ci</code> ont été joués contre une cible réelle — et le fait que <code>required_approving_review_count</code> reste à 0 tant qu'il n'y a qu'une seule personne pour approuver.</p>
     <p><b>« Qu'est-ce qui a le plus changé votre façon de voir l'infrastructure ? »</b> Les quatre bugs : aucun n'était visible en travaillant seule sur une seule machine familière. C'est le second environnement — le runner CI — qui les a fait apparaître. L'industrialisation, ce n'est pas seulement automatiser ce qui marche, c'est se donner les moyens de découvrir ce qui ne marche pas encore.</p>
   </div>
 </section>
@@ -1032,7 +1034,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   function ciText(state){
     if (state === 'running') return '● CI en cours · run #48';
     if (state === 'failed') return '● CI en échec · run #46';
-    return '● CI verte · deploy #47';
+    return '● CI verte';
   }
 
   function show(n, dir){
