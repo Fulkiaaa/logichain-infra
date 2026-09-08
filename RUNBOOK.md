@@ -91,13 +91,22 @@ port public utile (443, avec redirection 80→443).
 | Code applicatif, build | — | `/opt/logichain` (`dist/index.js`) |
 | Fichier d'environnement de l'API | rendu depuis `roles/app_runtime/templates/env.j2` | `/opt/logichain/.env` (0600) |
 | Configuration PM2 | rendu depuis `roles/app_runtime/templates/ecosystem.config.js.j2` | `/opt/logichain/ecosystem.config.js` |
-| Journaux applicatifs | — | `/opt/logichain/logs/{out,error}.log` |
+| Journaux applicatifs | — | `/opt/logichain/logs/{out-0,error-0}.log`¹ |
 | Vhost Nginx | rendu depuis `roles/web_proxy/templates/logichain.conf.j2` | `/etc/nginx/sites-available/logichain.conf` |
 | Certificat / clé TLS | — | `/etc/nginx/tls/logichain.{crt,key}` |
 | Configuration MongoDB | rendu depuis `roles/database/templates/mongod.conf.j2` | `/etc/mongod.conf` |
 | Données MongoDB | — | `/var/lib/mongodb` |
 | Script de sauvegarde | rendu depuis `roles/database/templates/mongodb-backup.sh.j2` | `/usr/local/bin/mongodb-backup.sh` (0700 root:root) |
 | Archives de sauvegarde | — | `/var/backups/mongodb/` (0700 root:root) |
+
+¹ Le template `ecosystem.config.js.j2` déclare `logs/out.log` et
+`logs/error.log`, mais PM2 y ajoute lui-même le suffixe de l'index
+d'instance (`-0`, une seule instance étant configurée) : sur la cible, les
+fichiers réellement écrits sont `out-0.log` et `error-0.log`, jamais
+`out.log`/`error.log`. C'est la cause identifiée du `No such file or
+directory` observé en diagnostic de la CD (voir `cd.yml`, étape
+« Diagnostiquer un échec de provisionnement ») quand celle-ci tentait de
+lire les chemins déclarés dans le template plutôt que les chemins réels.
 
 ### Limite connue — `/docs` (documentation Swagger/OpenAPI de l'API) n'est pas protégée
 
@@ -307,8 +316,8 @@ ci-dessous).
 > devient exécutable : la cible a d'abord été déployée sur `develop` (pour
 > forcer un vrai changement de code, `changed=4`), puis ramenée sur le tag
 > avec `-e app_version=v1.0.0` — checkout réussi, `changed=4` de nouveau,
-> et `git -C /opt/logichain rev-parse HEAD` sur la cible confirme le retour
-> exact au commit tagué. Voir « Durée attendue » ci-dessous pour la mesure
+> et `sudo -u logichain git -C /opt/logichain rev-parse HEAD` sur la cible
+> confirme le retour exact au commit tagué. Voir « Durée attendue » ci-dessous pour la mesure
 > complète. **Recommandation maintenue pour la suite : tagger chaque
 > release** (`git tag vX.Y.Z && git push --tags` sur `logichain-api`, au
 > moment de la fusion vers `main`) pour disposer d'une réf stable et
@@ -333,9 +342,10 @@ multipass exec logichain-staging -- sudo -u logichain -H bash -lc \
 lors de la répétition finale (tâche 17) sur la cible de référence : la
 cible avait d'abord été déployée sur `develop` pour forcer un vrai
 changement de code, puis ramenée sur le tag `v1.0.0`. Après le rollback,
-`git -C /opt/logichain rev-parse HEAD` confirme le retour exact au commit
-tagué, `/health` répond `200`, et `POST /api/v1/auth/login` avec des
-identifiants inexistants répond `401` avec le corps d'erreur métier. Les
+`sudo -u logichain git -C /opt/logichain rev-parse HEAD` confirme le retour
+exact au commit tagué, `/health` répond `200`, et `POST /api/v1/auth/login`
+avec des identifiants inexistants répond `401` avec le corps d'erreur
+métier. Les
 étapes qu'il traverse (checkout Git, `npm ci`, build TypeScript,
 `npm prune`, rechargement PM2) sont les mêmes que celles d'un déploiement
 normal (section 4) sur un code déjà présent en cache local Git : comme
@@ -393,6 +403,11 @@ multipass exec logichain-staging -- sudo ls -lh /var/backups/mongodb
 multipass exec logichain-staging -- sudo test -e /root/.mongodump-auth.yaml && echo "ANOMALIE : présent hors exécution" || echo "absent, comme attendu"
 
 # Journal des exécutions cron (utile si une nuit s'est mal passée)
+# — le fichier n'existe qu'après le premier passage du cron (03h00) ; sur
+# une VM tout juste provisionnée et pas encore restée active jusqu'à 3h,
+# cette commande échoue avec « No such file or directory », ce qui est
+# attendu et non une anomalie. Utiliser la sauvegarde manuelle ci-dessous
+# pour obtenir un journal immédiatement.
 multipass exec logichain-staging -- sudo tail -n 50 /var/log/mongodb-backup.log
 ```
 
@@ -659,7 +674,7 @@ avec un timeout de connexion SSH, alors que la VM est bien démarrée.
 multipass info logichain-staging | grep IPv4
 ```
 
-**Testé réellement** le 2026-09-08 : `192.168.252.4` (IP actuellement
+**Testé réellement** le 2026-09-08 : `192.168.252.5` (IP actuellement
 active et déjà à jour dans l'inventaire au moment de la rédaction).
 
 **Remède** :

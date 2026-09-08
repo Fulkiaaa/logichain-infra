@@ -2,7 +2,7 @@
 
 > Provisionnement et déploiement de l'infrastructure de la plateforme
 > logistique événementielle **LogiChain** (Ansible + GitHub Actions).
-> Projet noté — Module MP3 (Ops/Infra).
+> Projet noté — Module MP5 (Ops/Infra).
 
 Ce dépôt provisionne et déploie l'API `logichain-api` sur une VM Ubuntu
 24.04 : durcissement système, MongoDB en replica set, Node.js, proxy Nginx
@@ -121,8 +121,8 @@ passage de la revue obligatoire de 0 à 1 approbation).
 
 Pour l'exploitation de l'infrastructure en production (sauvegardes,
 rotation des secrets, procédures d'incident, astreinte), voir le
-[`RUNBOOK.md`](./RUNBOOK.md) de ce dépôt — **à venir**, rédigé dans une
-tâche ultérieure du plan d'industrialisation.
+[`RUNBOOK.md`](./RUNBOOK.md) de ce dépôt — livrable phare de ce module,
+10 sections testées et non seulement écrites.
 
 Les preuves de fonctionnement des règles de protection (Tâche 13) sont
 conservées dans [`soutenance/preuves/`](./soutenance/preuves/).
