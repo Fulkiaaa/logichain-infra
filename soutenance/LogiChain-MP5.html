@@ -277,7 +277,7 @@ body.plan-on .plan{display:block}
 
 <div class="chrome">
   <span class="brand">Logi<em>Chain</em> Infra</span>
-  <span class="ci"><span id="ciLabel">● CI verte · deploy #47</span></span>
+  <span class="ci"><span id="ciLabel">● CI verte</span></span>
   <span class="spacer"></span>
   <span class="hint"><kbd>←</kbd><kbd>→</kbd> naviguer · <kbd>N</kbd> notes · <kbd>P</kbd> plan · <kbd>T</kbd> thème</span>
 </div>
@@ -1032,8 +1032,8 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   // du MP4, appliquée à l'état du pipeline CI/CD plutôt qu'à la file
   // d'attente hors ligne.
   function ciText(state){
-    if (state === 'running') return '● CI en cours · run #48';
-    if (state === 'failed') return '● CI en échec · run #46';
+    if (state === 'running') return '● CI en cours';
+    if (state === 'failed') return '● CI en échec';
     return '● CI verte';
   }
 
