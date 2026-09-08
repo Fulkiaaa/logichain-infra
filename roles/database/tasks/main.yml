@@ -222,3 +222,36 @@
         options: {name: idx_events_status_start}
         state: present
   no_log: true
+
+# --- Sauvegarde quotidienne et rétention -------------------------------
+- name: Créer le répertoire des sauvegardes
+  ansible.builtin.file:
+    path: "{{ mongodb_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: mongodb_backup_enabled
+
+# Le script contient le mot de passe administrateur en clair (voir
+# mongodb-backup.sh.j2) : mode 0700 root:root pour qu'il ne soit lisible
+# que par root, et no_log pour qu'il ne fuite jamais dans la sortie ou les
+# journaux Ansible.
+- name: Déployer le script de sauvegarde
+  ansible.builtin.template:
+    src: mongodb-backup.sh.j2
+    dest: /usr/local/bin/mongodb-backup.sh
+    owner: root
+    group: root
+    mode: "0700"
+  no_log: true
+  when: mongodb_backup_enabled
+
+- name: Planifier la sauvegarde quotidienne
+  ansible.builtin.cron:
+    name: sauvegarde mongodb logichain
+    hour: "{{ mongodb_backup_hour }}"
+    minute: "0"
+    job: /usr/local/bin/mongodb-backup.sh >> /var/log/mongodb-backup.log 2>&1
+    state: present
+  when: mongodb_backup_enabled
