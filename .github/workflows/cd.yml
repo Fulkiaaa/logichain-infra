@@ -35,6 +35,25 @@ jobs:
       - name: Provisionner
         run: ansible-playbook site.yml -i inventories/ci
 
+      # Diagnostic pur (n'affecte jamais le statut du job) : aucune
+      # information exploitable sur la cause d'un échec de provisionnement
+      # n'apparaît dans la sortie d'ansible-playbook ci-dessus au-delà de
+      # « changed »/« failed » — les vrais journaux (PM2, systemd, ports en
+      # écoute) ne sont visibles qu'en interrogeant la cible elle-même.
+      - name: Diagnostiquer un échec de provisionnement
+        if: failure()
+        run: |
+          echo "--- pm2 status (utilisateur logichain) ---"
+          sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 status' || true
+          echo "--- pm2 logs (100 dernières lignes) ---"
+          sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 logs --nostream --lines 100' || true
+          echo "--- ports en écoute ---"
+          sudo ss -tlnp || true
+          echo "--- statut mongod ---"
+          sudo systemctl status mongod --no-pager || true
+          echo "--- .env applicatif (secrets masqués) ---"
+          sudo sed -E 's/(JWT_SECRET|MONGO_URI)=.*/\1=***/' /opt/logichain/.env || true
+
       # 2. Second passage — la garantie d'idempotence.
       #
       # `set -o pipefail` (déjà actif par défaut dans les steps `run:` bash de
