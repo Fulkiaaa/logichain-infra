@@ -762,7 +762,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   <div class="notes">
     <h4>Conduite</h4>
     <p>Si le temps le permet, lance réellement <code>multipass launch</code> en direct avant la slide (ça prend le temps de ton intro) et affiche le résultat ici — sinon, la capture réelle suffit, elle est datée et vérifiable.</p>
-    <p>Insiste sur la méthode de mesure : <code>script -q /dev/null</code> plutôt que <code>time</code> seul, pour conserver l'intégralité de la sortie (couleurs comprises) comme preuve, tout en obtenant un total fiable au pied du journal.</p>
+    <p>Insiste sur la méthode de mesure : la mesure définitive a été prise avec <code>time</code>, dont le total apparaît au pied du journal ci-dessus. La sortie complète est conservée dans <code>soutenance/preuves/</code> comme preuve. Si le jury demande la commande exacte : <code>time ansible-playbook site.yml</code>.</p>
     <p class="q">Si on demande « avez-vous rejoué cette démonstration récemment ? » : la reconstruction complète depuis une VM détruite n'a pas été rejouée une seconde fois pour ce Runbook — ça aurait détruit l'environnement de démo actif. Ce qui a été revérifié le même jour, sur la VM existante déjà provisionnée : un nouveau passage de <code>site.yml</code> en non-régression, résultat attendu <code>changed=0, failed=0</code> — confirmé.</p>
   </div>
 </section>
@@ -814,7 +814,7 @@ ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu
   <div class="notes">
     <h4>Conduite</h4>
     <p>C'est le bug le plus instructif de toute la soutenance : il ne parle pas de code cassé, il parle de <b>hasard</b> — un mot de passe aléatoire qui contient ou non un caractère piège. Assume-le comme un argument en faveur du multi-environnement, pas comme une honte.</p>
-    <p><b>Provisionnement mesuré sur le runner : 4 min 35 s</b> — plus long qu'en local (1 min 38) parce que le runner part encore plus vierge (aucun paquet en cache APT, contrairement à la VM Multipass réutilisée).</p>
+    <p><b>Provisionnement mesuré sur le runner : 4 min 35 s</b> — plus long qu'en local (1 min 38). L'écart précis n'a pas été instrumenté ; deux facteurs plausibles à formuler comme hypothèse, pas comme certitude : le runner GitHub est une machine distante mutualisée, avec des entrées-sorties et une bande passante réseau moins favorables, et l'image Multipass d'Ubuntu 24.04 embarque déjà certains paquets de base.</p>
     <p class="q">Si on demande « le CD déploie-t-il en production réelle ? » : non, assume-le explicitement — c'est une limite documentée (slide 26). Le runner est une machine vierge de démonstration, plus exigeante qu'un serveur permanent puisque tout est refait à chaque fusion, mais ce n'est pas encore un déploiement en production.</p>
   </div>
 </section>
