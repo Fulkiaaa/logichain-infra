@@ -61,26 +61,55 @@
     mode: "0644"
   notify: Recharger nginx
 
-- name: Activer le vhost
-  ansible.builtin.file:
-    src: /etc/nginx/sites-available/logichain.conf
-    dest: /etc/nginx/sites-enabled/logichain.conf
-    state: link
-  notify: Recharger nginx
+# Bloc protégé : si `nginx -t` échoue, le rescue retire immédiatement le
+# lien symbolique du vhost invalide de sites-enabled/. Sans ce filet,
+# l'activation du vhost (ci-dessous) précéderait la validation : en cas
+# d'échec, le play s'arrête mais le lien resterait en place. Nginx continue
+# de tourner sur son ancienne configuration en mémoire (rien ne casse dans
+# l'immédiat), mais tout redémarrage futur (reboot, mise à jour de paquet,
+# `systemctl restart nginx`) relirait ce fichier invalide depuis le disque
+# et ferait échouer le démarrage du service tout entier — pas seulement une
+# mise à jour ratée, une coupure totale du proxy.
+- name: Activer et valider le vhost LogiChain
+  block:
+    - name: Activer le vhost
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/logichain.conf
+        dest: /etc/nginx/sites-enabled/logichain.conf
+        state: link
+      notify: Recharger nginx
 
-- name: Désactiver le site par défaut
-  ansible.builtin.file:
-    path: /etc/nginx/sites-enabled/default
-    state: absent
-  notify: Recharger nginx
+    - name: Désactiver le site par défaut
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Recharger nginx
 
-# Garde-fou : valide la configuration complète (vhost + suppression du site
-# par défaut) avant tout démarrage ou rechargement de Nginx. Voir la note
-# ci-dessus pour la justification de cette tâche par rapport au brief.
-- name: Vérifier la configuration Nginx avant démarrage
-  ansible.builtin.command:
-    cmd: nginx -t -c /etc/nginx/nginx.conf
-  changed_when: false
+    # Garde-fou : valide la configuration complète (vhost + suppression du
+    # site par défaut) avant tout démarrage ou rechargement de Nginx. Voir
+    # la note plus haut sur la justification de cette tâche par rapport au
+    # brief.
+    - name: Vérifier la configuration Nginx avant démarrage
+      ansible.builtin.command:
+        cmd: nginx -t -c /etc/nginx/nginx.conf
+      changed_when: false
+  rescue:
+    - name: Retirer le lien symbolique du vhost invalide
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/logichain.conf
+        state: absent
+
+    - name: Échouer explicitement après retrait du vhost invalide
+      ansible.builtin.fail:
+        msg: >-
+          La configuration Nginx générée pour le vhost LogiChain est
+          invalide (échec de « nginx -t »). Le lien symbolique a été retiré
+          de /etc/nginx/sites-enabled/ pour qu'un redémarrage ultérieur de
+          Nginx (reboot, mise à jour de paquet, `systemctl restart nginx`)
+          ne rencontre pas ce fichier invalide et ne fasse pas échouer le
+          service entier. Nginx continue de tourner avec sa configuration
+          précédente. Corrigez le template logichain.conf.j2 puis rejouez
+          le rôle.
 
 - name: Activer Nginx au démarrage
   ansible.builtin.service:

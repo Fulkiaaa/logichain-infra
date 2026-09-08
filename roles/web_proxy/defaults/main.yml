@@ -2,6 +2,13 @@
 # Interface documentée du rôle : toute variable consommée par tasks/main.yml
 # doit avoir une valeur par défaut, pour que le rôle reste jouable seul.
 
+# Port sur lequel l'API écoute en local (proxifié par le vhost via
+# 127.0.0.1:{{ app_port }}). Variable partagée avec les autres rôles
+# (nodejs, database) : sa valeur réelle vient normalement de
+# inventories/staging/group_vars/all/vars.yml. Répétée ici uniquement pour
+# que ce rôle reste jouable seul, comme l'exige la convention du projet.
+app_port: 3000
+
 # Nom de serveur utilisé dans les directives `server_name` du vhost Nginx.
 web_proxy_server_name: logichain.local
 
