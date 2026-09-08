@@ -176,22 +176,25 @@ multipass info logichain-staging | grep IPv4
 ansible-playbook site.yml -i inventories/staging
 ```
 
-**Durée mesurée : 1 min 36 s (1:36.23)**, sur la cible de référence
+**Durée mesurée : 1 min 38 s (1:38.14)**, sur la cible de référence
 (VM Multipass `logichain-staging`, Ubuntu 24.04, machine réellement vierge,
-détruite puis recréée avant la mesure). Mesurée avec :
+**détruite puis recréée avant la mesure** — `multipass delete
+logichain-staging --purge` puis `multipass launch`). Mesurée avec :
 
 ```bash
-script -q /dev/null ansible-playbook site.yml
+time ansible-playbook site.yml -i inventories/staging
 ```
 
-et non avec `time` : `script` capture l'intégralité de la sortie (couleurs
-comprises) dans un journal de preuve, et c'est le pied de ce journal
-(zsh, builtin `time`, appliqué à la commande `script` elle-même) qui donne
-le total `1:36.23`. Le journal complet est conservé dans
-`soutenance/preuves/rebuild-2026-09-08.log`.
+`time` (builtin zsh) chronomètre directement `ansible-playbook` — la
+sortie standard de la commande est capturée telle quelle dans le journal
+de preuve, sans intermédiaire (`script` avait été utilisé pour une mesure
+antérieure ; sa sortie ne reflétait pas la commande réellement exécutée et
+n'a pas été reconduite). PLAY RECAP obtenu :
+`ok=76 changed=57 unreachable=0 failed=0 skipped=0`. Le journal complet
+est conservé dans `soutenance/preuves/rebuild-2026-09-08.log`.
 
-**Idempotence** : un second passage donne `changed=0` (58 tâches au
-second passage, dont 11 `skipped`) — journal complet dans
+**Idempotence** : un second passage donne `changed=0`
+(`ok=58 changed=0 skipped=11`) — journal complet dans
 `soutenance/preuves/idempotence-2026-09-08.log`.
 
 ```bash
@@ -209,16 +212,18 @@ curl -sk -o /dev/null -w '%{http_code}\n' -X POST https://$IP/api/v1/auth/login 
 # attendu : {"status":"ok",...} puis 200 ; puis 401 (preuve que MongoDB est réellement interrogé)
 ```
 
-**Ce qui a été vérifié pour ce Runbook, et ce qui ne l'a pas été.** La
-reconstruction complète depuis une VM détruite puis recréée **n'a pas été
-rejouée pendant la rédaction de ce document** : elle l'a été le même jour
-(2026-09-08) en tâche dédiée, avec les journaux de preuve cités ci-dessus,
-et la rejouer une nouvelle fois aurait détruit l'environnement de
-démonstration actif (données `LC-POWER-002`) sans rien apprendre de plus.
-Ce qui **a** été rejoué réellement aujourd'hui, sur la VM existante déjà
-provisionnée : `ansible-playbook site.yml -i inventories/staging` en
-non-régression, avec le résultat attendu `changed=0, failed=0` — la
-commande et l'inventaire actuels sont donc confirmés fonctionnels.
+**Ce qui a été vérifié.** La reconstruction complète depuis une VM
+réellement détruite puis recréée a été rejouée le 2026-09-08 lors de la
+répétition finale de soutenance (tâche 17) : `multipass delete
+logichain-staging --purge`, `multipass launch`, mise à jour de l'IP dans
+l'inventaire, puis `time ansible-playbook site.yml`. C'est cette
+répétition qui a produit les journaux de preuve actuels
+(`rebuild-2026-09-08.log`, `idempotence-2026-09-08.log`) et les chiffres
+ci-dessus — répéter sur une VM déjà provisionnée aurait masqué
+précisément ce qu'on cherche à découvrir (`apt` lent, dépôt momentanément
+injoignable, timeout). L'environnement obtenu est neuf : les données de
+démonstration (`LC-POWER-002`) n'y existent plus tant qu'elles n'ont pas
+été rejouées.
 
 ---
 
@@ -274,7 +279,7 @@ cours.
 **Mécanisme :**
 
 ```bash
-ansible-playbook playbooks/deploy.yml -i inventories/staging -e app_version=<réf-git-précédente>
+ansible-playbook playbooks/deploy.yml -i inventories/staging -e app_version=v1.0.0
 ```
 
 `app_version` est passé tel quel au module `ansible.builtin.git`
@@ -283,24 +288,33 @@ n'importe quelle réf Git valide fonctionne — tag, branche, ou SHA de commit
 **à condition qu'il soit exposé comme réf par le serveur Git** (voir
 ci-dessous).
 
-> **Écart constaté en testant cette section, à corriger avant le premier
-> rollback réel.** `logichain-api` **ne possède aujourd'hui aucun tag**
-> (`git ls-remote --tags` renvoie une liste vide, vérifié le 2026-09-08).
-> Rollback vers un SHA de commit arbitraire non exposé comme réf échoue :
-> testé avec `-e app_version=c4725a6 --check`, le module `git` échoue avec
-> `fatal: couldn't find remote ref c4725a6` (`git fetch --dry-run origin
-> c4725a6` ne trouve pas de réf de ce nom — un SHA brut n'est pas une réf
-> tant qu'il n'est pas la pointe d'une branche ou d'un tag). Testé à
-> l'inverse avec une **branche réelle** (`-e app_version=develop --check`) :
-> le checkout est correctement pris en compte (`changed` sur la tâche
-> « Récupérer le code source »). **Recommandation avant la mise en
-> production réelle : tagger chaque release** (`git tag vX.Y.Z && git push
-> --tags` sur `logichain-api`, au moment de la fusion vers `main`) pour
-> disposer d'une réf stable et lisible pour `app_version`. À défaut,
-> utiliser le nom de la branche `main` d'avant le déploiement fautif
-> n'est pas possible non plus (`main` avance) — la seule solution de repli
-> sans tag est de créer une branche temporaire sur le commit voulu
-> (`git push origin <sha>:refs/heads/rollback-tmp`) puis
+> **Écart constaté en rédigeant cette section, corrigé depuis (tâche 17,
+> répétition finale du 2026-09-08).** Au moment de la rédaction initiale de
+> ce Runbook, `logichain-api` **ne possédait aucun tag**
+> (`git ls-remote --tags` renvoyait une liste vide). Rollback vers un SHA
+> de commit arbitraire non exposé comme réf échouait : testé avec
+> `-e app_version=c4725a6 --check`, le module `git` échoue avec `fatal:
+> couldn't find remote ref c4725a6` (`git fetch --dry-run origin c4725a6`
+> ne trouve pas de réf de ce nom — un SHA brut n'est pas une réf tant qu'il
+> n'est pas la pointe d'une branche ou d'un tag). Testé à l'inverse avec
+> une **branche réelle** (`-e app_version=develop --check`) : le checkout
+> est correctement pris en compte (`changed` sur la tâche « Récupérer le
+> code source »).
+>
+> **Corrigé** : le tag annoté `v1.0.0` a été créé sur `main` et poussé
+> (`git tag -a v1.0.0 && git push origin v1.0.0`, 2026-09-08). Rejoué
+> réellement contre la cible de référence pour confirmer que la procédure
+> devient exécutable : la cible a d'abord été déployée sur `develop` (pour
+> forcer un vrai changement de code, `changed=4`), puis ramenée sur le tag
+> avec `-e app_version=v1.0.0` — checkout réussi, `changed=4` de nouveau,
+> et `git -C /opt/logichain rev-parse HEAD` sur la cible confirme le retour
+> exact au commit tagué. Voir « Durée attendue » ci-dessous pour la mesure
+> complète. **Recommandation maintenue pour la suite : tagger chaque
+> release** (`git tag vX.Y.Z && git push --tags` sur `logichain-api`, au
+> moment de la fusion vers `main`) pour disposer d'une réf stable et
+> lisible pour `app_version`. Pour une release antérieure non taguée, la
+> seule solution de repli reste de créer une branche temporaire sur le
+> commit voulu (`git push origin <sha>:refs/heads/rollback-tmp`) puis
 > `-e app_version=rollback-tmp`.
 
 Après le checkout, PM2 est rechargé automatiquement (handler « Recharger
@@ -314,16 +328,19 @@ multipass exec logichain-staging -- sudo -u logichain -H bash -lc \
   'cd /opt/logichain && pm2 reload logichain-api --update-env && pm2 save'
 ```
 
-**Durée attendue.** Un rollback réel (avec changement de code effectif)
-**n'a pas été exécuté** pendant la rédaction de ce Runbook — le déployer
-sur la cible de référence aurait modifié la version de code servie par
-l'environnement de démonstration partagé, sans qu'un vrai incident le
-justifie. Les étapes qu'il traverse (checkout Git, `npm ci`, build
-TypeScript, `npm prune`, rechargement PM2) sont les mêmes que celles d'un
-déploiement normal (section 4) sur un code déjà présent en cache local
-Git : à titre d'ordre de grandeur, très inférieur à la reconstruction
-complète (1 min 36 s pour *tous* les rôles). **À chronométrer précisément
-au premier rollback réel et à reporter dans cette section.**
+**Durée mesurée : 14,3 s** (`ansible-playbook playbooks/deploy.yml
+-e app_version=v1.0.0`, `changed=4`), rollback réel exécuté le 2026-09-08
+lors de la répétition finale (tâche 17) sur la cible de référence : la
+cible avait d'abord été déployée sur `develop` pour forcer un vrai
+changement de code, puis ramenée sur le tag `v1.0.0`. Après le rollback,
+`git -C /opt/logichain rev-parse HEAD` confirme le retour exact au commit
+tagué, `/health` répond `200`, et `POST /api/v1/auth/login` avec des
+identifiants inexistants répond `401` avec le corps d'erreur métier. Les
+étapes qu'il traverse (checkout Git, `npm ci`, build TypeScript,
+`npm prune`, rechargement PM2) sont les mêmes que celles d'un déploiement
+normal (section 4) sur un code déjà présent en cache local Git : comme
+attendu, très inférieur à la reconstruction complète (1 min 38 s pour
+*tous* les rôles).
 
 ---
 
@@ -339,7 +356,25 @@ bien.
 | Script | `/usr/local/bin/mongodb-backup.sh` (`0700 root:root`, contient le mot de passe administrateur MongoDB — jamais lisible hors root) |
 | Planification | cron root, tous les jours à **03h00** |
 | Rétention | **7 jours** (purge par `find -mtime +7 -delete`, exécutée à chaque passage du script) |
-| Format | `mongodump --archive --gzip` — un fichier `logichain-<date>-<heure>.archive.gz` par exécution |
+| Format | `mongodump --archive --gzip` — un fichier `logichain-<date>-<heure>.archive.gz` par exécution, **`0600 root:root`** (`umask 077` appliqué par le script dès la première ligne) |
+| Fichier d'état | `/var/backups/mongodb/.last-status` — `OK <horodatage> <archive>` en cas de succès, `FAILED <horodatage>` sinon ; **c'est le contrôle d'exploitation à lire en premier** (section suivante), écrit à chaque exécution, succès ou échec |
+| Fichier transitoire | `/root/.mongodump-auth.yaml` — contient le mot de passe administrateur le temps de l'exécution de `mongodump` (lu via `--config`, jamais via `--password` en argument) ; supprimé par le script avant sa sortie, succès ou échec (`trap cleanup EXIT`) — **ne doit jamais être trouvé présent en dehors d'une exécution en cours** |
+
+### Contrôle d'exploitation : l'état de la dernière sauvegarde
+
+Le moyen le plus rapide de vérifier qu'une sauvegarde nocturne s'est bien
+passée, sans avoir à parcourir le journal cron ni à lister les archives :
+
+```bash
+multipass exec logichain-staging -- sudo cat /var/backups/mongodb/.last-status
+# attendu : OK <horodatage-ISO8601> /var/backups/mongodb/<archive>.archive.gz
+# en cas d'échec : FAILED <horodatage-ISO8601> — creuser alors le journal
+# cron (commande suivante) pour la cause
+```
+
+Ce fichier est réécrit à **chaque** exécution du script (succès ou échec) :
+un `OK` obsolète (horodatage antérieur à la nuit dernière) est en soi le
+signe qu'une exécution a été manquée ou n'a pas pu écrire son état.
 
 ### Vérifier que la sauvegarde tourne réellement
 
@@ -347,11 +382,15 @@ bien.
 # La tâche cron est bien programmée
 multipass exec logichain-staging -- sudo crontab -l
 
-# Permissions correctes (secret dans le script → doit être 0700 root:root)
+# Permissions correctes (secret dans le script → doit être 0700 root:root ;
+# archives → 0600 root:root)
 multipass exec logichain-staging -- sudo stat -c '%a %U:%G %n' /usr/local/bin/mongodb-backup.sh /var/backups/mongodb
 
 # Dernières archives produites
 multipass exec logichain-staging -- sudo ls -lh /var/backups/mongodb
+
+# Le fichier transitoire ne doit jamais être présent hors exécution
+multipass exec logichain-staging -- sudo test -e /root/.mongodump-auth.yaml && echo "ANOMALIE : présent hors exécution" || echo "absent, comme attendu"
 
 # Journal des exécutions cron (utile si une nuit s'est mal passée)
 multipass exec logichain-staging -- sudo tail -n 50 /var/log/mongodb-backup.log
