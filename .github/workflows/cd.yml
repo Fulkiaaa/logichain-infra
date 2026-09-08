@@ -1,0 +1,104 @@
+# Pipeline de déploiement continu.
+#
+# La cible réelle (VM Multipass locale) est injoignable depuis un runner
+# GitHub : le runner EST donc la machine vierge. Chaque exécution fournit un
+# Ubuntu 24.04 neuf sur lequel le playbook complet est joué en connexion
+# locale (inventories/ci), rejoué pour vérifier l'idempotence, puis vérifié
+# par des tests de fumée contre l'API réellement déployée.
+---
+name: cd
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  provision:
+    name: Provisionnement et idempotence
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+
+      - name: Installer Ansible
+        run: |
+          pip install ansible
+          ansible-galaxy collection install -r requirements.yml
+
+      - name: Écrire le mot de passe du vault
+        run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault-pass
+      - run: chmod 600 .vault-pass
+
+      # 1. Provisionnement complet sur un Ubuntu 24.04 neuf.
+      - name: Provisionner
+        run: ansible-playbook site.yml -i inventories/ci
+
+      # 2. Second passage — la garantie d'idempotence.
+      #
+      # `set -o pipefail` (déjà actif par défaut dans les steps `run:` bash de
+      # GitHub Actions, répété ici par clarté) fait échouer immédiatement
+      # cette étape si ansible-playbook lui-même se termine en erreur — un
+      # `failed=1` ne peut donc jamais se glisser derrière un `changed=0` et
+      # passer inaperçu. La récupération du récapitulatif final (PLAY RECAP)
+      # est ensuite analysée explicitement : l'absence de récap exploitable
+      # (format inattendu, ligne manquante) fait échouer le contrôle plutôt
+      # que de le laisser passer par défaut.
+      - name: Vérifier l'idempotence
+        run: |
+          set -o pipefail
+          ansible-playbook site.yml -i inventories/ci | tee run2.log
+
+          recap=$(grep -E ': *ok=[0-9]+ *changed=[0-9]+' run2.log | tail -n1)
+          echo "Récapitulatif du second passage : ${recap}"
+
+          changed=$(echo "${recap}" | grep -oE 'changed=[0-9]+' | cut -d= -f2)
+          failed=$(echo "${recap}" | grep -oE 'failed=[0-9]+' | cut -d= -f2)
+
+          if [ -z "${changed}" ] || [ -z "${failed}" ]; then
+            echo "::error::Impossible d'extraire le récapitulatif du second passage — contrôle d'idempotence en échec par défaut"
+            exit 1
+          fi
+
+          if [ "${changed}" != "0" ] || [ "${failed}" != "0" ]; then
+            echo "::error::Playbook non idempotent — changed=${changed} failed=${failed} au second passage"
+            exit 1
+          fi
+
+      # 3. Tests de fumée contre l'API réellement déployée.
+      - name: Tests de fumée — santé de l'API (direct)
+        run: curl -fsS http://127.0.0.1:3000/health
+
+      - name: Tests de fumée — santé de l'API (via le proxy Nginx, TLS)
+        run: curl -fsS -o /dev/null -w '%{http_code}\n' -k https://localhost/health
+
+      # Preuve que MongoDB est réellement interrogé (pas seulement que Node
+      # tourne) : des identifiants inexistants doivent produire un 401 au
+      # format d'erreur métier de l'API (voir src/core/errors/UnauthorizedError.ts
+      # et src/middlewares/error-handler.middleware.ts côté logichain-api),
+      # pas une erreur de connexion ni un 500.
+      - name: Tests de fumée — authentification refusée (401, format métier)
+        run: |
+          http_code=$(curl -s -k -o /tmp/login-response.json -w '%{http_code}' \
+            -X POST https://localhost/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"personne-inexistante@example.com","password":"mot-de-passe-inexistant-1!"}')
+
+          echo "Code HTTP reçu : ${http_code}"
+          cat /tmp/login-response.json
+
+          if [ "${http_code}" != "401" ]; then
+            echo "::error::Attendu HTTP 401, reçu ${http_code}"
+            exit 1
+          fi
+
+          error_code=$(python3 -c "import json,sys; print(json.load(open('/tmp/login-response.json'))['error']['code'])")
+          if [ "${error_code}" != "UNAUTHORIZED" ]; then
+            echo "::error::Code d'erreur métier attendu UNAUTHORIZED, reçu ${error_code}"
+            exit 1
+          fi
+
+      - name: Nettoyer le mot de passe du vault
+        if: always()
+        run: rm -f .vault-pass
