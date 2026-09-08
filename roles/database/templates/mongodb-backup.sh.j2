@@ -23,22 +23,47 @@ TMP_DEST="${DEST}.tmp"
 # fichier de configuration (--config), jamais depuis --password.
 AUTH_CONFIG="/root/.mongodump-auth.yaml"
 STATUS_FILE="{{ mongodb_backup_dir }}/.last-status"
+# Vrai uniquement une fois mongodump terminé avec succès : distingue, en
+# cas d'échec, un .tmp incomplet/corrompu (à supprimer) d'un .tmp qui
+# contient en réalité un dump complet et valide mais que le `mv` final n'a
+# pas réussi à renommer (à préserver — voir cleanup ci-dessous).
+DUMP_COMPLETE=0
 
 # Nettoyage et rapport d'état systématiques, y compris en cas d'échec : le
-# fichier de configuration et l'archive temporaire ne doivent jamais
-# survivre à la fin du script (succès ou non), et l'état de la dernière
-# exécution doit toujours être connaissable sans avoir à lire un journal
-# (utile en particulier pour l'exécution silencieuse via cron).
+# fichier de configuration ne doit jamais survivre à la fin du script
+# (succès ou non), et l'état de la dernière exécution doit toujours être
+# connaissable sans avoir à lire un journal (utile en particulier pour
+# l'exécution silencieuse via cron).
 cleanup() {
   local rc=$?
   rm -f "${AUTH_CONFIG}"
   if [ "${rc}" -ne 0 ]; then
-    rm -f "${TMP_DEST}"
+    if [ "${DUMP_COMPLETE}" -eq 0 ]; then
+      # mongodump n'a pas fini : ${TMP_DEST}, s'il existe, est incomplet.
+      rm -f "${TMP_DEST}"
+    fi
+    # Si DUMP_COMPLETE=1, mongodump a réussi mais le `mv` a échoué : on
+    # laisse ${TMP_DEST} en l'état (dump complet et valide, seulement pas
+    # encore sous son nom final) plutôt que de détruire une sauvegarde
+    # exploitable.
     printf 'FAILED %s\n' "$(date -Is)" > "${STATUS_FILE}"
   fi
   exit "${rc}"
 }
 trap cleanup EXIT
+# Indispensable : sans ces deux traps explicites, un SIGTERM (arrêt cron ou
+# systemd, OOM killer — qui envoie SIGTERM avant SIGKILL) ou un SIGINT reçu
+# PENDANT mongodump ne changerait jamais $? à l'intérieur du trap EXIT.
+# Constaté : bash, en l'absence de trap explicite sur ces signaux, y voit
+# encore le code de sortie de la DERNIÈRE COMMANDE ACHEVÉE avant le signal
+# (ici 0, celui du `printf` qui écrit AUTH_CONFIG), jamais celui du signal
+# lui-même — puisque la commande interrompue (mongodump) n'a justement
+# jamais rendu la main pour fixer son propre $?. Le fichier d'état
+# mentirait alors silencieusement en conservant un ancien OK. Un `exit
+# <code>` explicite dans ces traps force un $? non nul, vu par le trap
+# EXIT ci-dessus.
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 printf 'password: %s\n' "{{ vault_mongodb_admin_password }}" > "${AUTH_CONFIG}"
 
@@ -49,10 +74,17 @@ mongodump \
   --db="{{ mongodb_database }}" \
   --archive="${TMP_DEST}" --gzip --quiet
 
+DUMP_COMPLETE=1
+
 mv "${TMP_DEST}" "${DEST}"
 
-# Purge au-delà de la rétention
+# Purge au-delà de la rétention : archives finalisées, et fichiers .tmp
+# périmés qui échappent au premier motif (mongodump interrompu avant
+# d'avoir pu être supprimé par cleanup, ou dump complet jamais renommé —
+# voir DUMP_COMPLETE ci-dessus).
 find "{{ mongodb_backup_dir }}" -name '*.archive.gz' \
+     -mtime +{{ mongodb_backup_retention_days }} -delete
+find "{{ mongodb_backup_dir }}" -name '*.archive.gz.tmp' \
      -mtime +{{ mongodb_backup_retention_days }} -delete
 
 printf 'OK %s %s\n' "$(date -Is)" "${DEST}" > "${STATUS_FILE}"
