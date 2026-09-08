@@ -1,0 +1,16 @@
+---
+# Interface documentée du rôle : toute variable consommée par tasks/main.yml
+# doit avoir une valeur par défaut, pour que le rôle reste jouable seul.
+
+# Nom de serveur utilisé dans les directives `server_name` du vhost Nginx.
+web_proxy_server_name: logichain.local
+
+# Mode de gestion du certificat TLS. À ce stade du projet, seul `selfsigned`
+# est implémenté (généré par community.crypto). `letsencrypt` est réservé à
+# une itération ultérieure (nécessite un nom de domaine public résolvable).
+web_proxy_tls_mode: selfsigned        # selfsigned | letsencrypt
+
+# Emplacement du certificat et de la clé privée sur la cible.
+web_proxy_tls_dir: /etc/nginx/tls
+web_proxy_cert_path: "{{ web_proxy_tls_dir }}/logichain.crt"
+web_proxy_key_path: "{{ web_proxy_tls_dir }}/logichain.key"

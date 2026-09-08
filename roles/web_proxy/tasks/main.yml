@@ -1,0 +1,89 @@
+---
+- name: Installer Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Créer le répertoire des certificats
+  ansible.builtin.file:
+    path: "{{ web_proxy_tls_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+# Certificat auto-signé par modules natifs — pas d'appel `openssl` en shell,
+# et donc idempotent : la clé n'est régénérée que si elle est absente.
+- name: Générer la clé privée
+  community.crypto.openssl_privatekey:
+    path: "{{ web_proxy_key_path }}"
+    size: 2048
+    mode: "0600"
+  when: web_proxy_tls_mode == 'selfsigned'
+
+- name: Générer le certificat auto-signé
+  community.crypto.x509_certificate:
+    path: "{{ web_proxy_cert_path }}"
+    privatekey_path: "{{ web_proxy_key_path }}"
+    provider: selfsigned
+    selfsigned_not_after: "+365d"
+    mode: "0644"
+  when: web_proxy_tls_mode == 'selfsigned'
+  notify: Recharger nginx
+
+# NOTE — écart documenté par rapport au brief (voir task-6-report.md) :
+# le brief prévoyait `validate: nginx -t -c /etc/nginx/nginx.conf` sur ce
+# template. Deux obstacles techniques rendent cette forme littérale
+# inutilisable avec la version d'Ansible installée (community.crypto 3.3.0 /
+# ansible-core récent) :
+#   1. Le module `template` exige désormais que la chaîne `validate`
+#      contienne `%s` (placeholder substitué par le fichier temporaire déjà
+#      rendu) — sans quoi la tâche échoue immédiatement avec
+#      "validate must contain %s", avant même d'écrire quoi que ce soit.
+#   2. Même en ajoutant `%s`, `nginx -t -c %s` ne peut PAS valider un simple
+#      fragment de vhost : nginx charge alors ce fichier comme configuration
+#      racine, et un bloc `server { ... }` hors d'un contexte `http {}` est
+#      rejeté avec l'erreur `"server" directive is not allowed here` — un
+#      faux négatif systématique, vérifié empiriquement sur la cible, quel
+#      que soit le contenu réel du vhost.
+# Le garde-fou est donc déplacé vers une tâche `nginx -t` dédiée ci-dessous,
+# exécutée sur la configuration complète (vhost activé, site par défaut
+# retiré) et AVANT le démarrage/rechargement du service : en cas d'échec, le
+# play s'arrête et les handlers en attente (dont « Recharger nginx ») ne
+# sont jamais déclenchés — Nginx ne recharge donc jamais une configuration
+# invalide.
+- name: Déployer le vhost LogiChain
+  ansible.builtin.template:
+    src: logichain.conf.j2
+    dest: /etc/nginx/sites-available/logichain.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recharger nginx
+
+- name: Activer le vhost
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/logichain.conf
+    dest: /etc/nginx/sites-enabled/logichain.conf
+    state: link
+  notify: Recharger nginx
+
+- name: Désactiver le site par défaut
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Recharger nginx
+
+# Garde-fou : valide la configuration complète (vhost + suppression du site
+# par défaut) avant tout démarrage ou rechargement de Nginx. Voir la note
+# ci-dessus pour la justification de cette tâche par rapport au brief.
+- name: Vérifier la configuration Nginx avant démarrage
+  ansible.builtin.command:
+    cmd: nginx -t -c /etc/nginx/nginx.conf
+  changed_when: false
+
+- name: Activer Nginx au démarrage
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
