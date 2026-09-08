@@ -47,6 +47,12 @@ jobs:
           sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 status' || true
           echo "--- pm2 logs (100 dernières lignes) ---"
           sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 logs --nostream --lines 100' || true
+          echo "--- node résolu par l'utilisateur logichain ---"
+          sudo -u logichain -H bash -lc 'which node; node -v; echo "PATH=$PATH"' || true
+          echo "--- logs applicatifs — error.log ---"
+          sudo tail -n 100 /opt/logichain/logs/error.log || true
+          echo "--- logs applicatifs — out.log ---"
+          sudo tail -n 100 /opt/logichain/logs/out.log || true
           echo "--- ports en écoute ---"
           sudo ss -tlnp || true
           echo "--- statut mongod ---"
