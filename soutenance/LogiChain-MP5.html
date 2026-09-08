@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LogiChain Infra · MP5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Palette claire, dérivée de PALETTES.light de l'app, assombrie là où il
+     faut : un ton lisible sur ardoise devient illisible sur blanc. */
+  --ink:#f7f9fc;
+  --panel:#ffffff;
+  --panel-2:#eef2f7;
+  --line:#d5dee9;
+  --line-soft:rgba(15,23,42,.10);
+  --text:#0f172a;
+  --muted:#5a6c82;
+  /* accent structurel : orange haute-visibilité, celui des gilets et du gaffer */
+  --signal:#c2410c;
+  --signal-soft:rgba(194,65,12,.07);
+  --signal-on:#ffffff;
+  /* primaire de l'app, repris pour que les captures s'y fondent */
+  --app:#0369a1;
+  --ok:#15803d;
+  --alert:#b91c1c;
+  --warn:#b45309;
+  --glow-ok:rgba(21,128,61,.15);
+  --glow-warn:rgba(180,83,9,.15);
+  --glow-app:rgba(3,105,161,.15);
+  --glow-alert:rgba(185,28,28,.15);
+  --chrome-a:rgba(247,249,252,.97);
+  --chrome-b:rgba(247,249,252,.80);
+  --notes-text:#243349;
+  --display:"Barlow Condensed",Impact,sans-serif;
+  --body:"IBM Plex Sans",-apple-system,Segoe UI,Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+:root[data-theme="dark"]{
+  --ink:#0b1220;
+  --panel:#131d2f;
+  --panel-2:#1a2740;
+  --line:#26344c;
+  --line-soft:rgba(234,241,250,.09);
+  --text:#eaf1fa;
+  --muted:#8ea3bd;
+  --signal:#ff8a3d;
+  --signal-soft:rgba(255,138,61,.09);
+  --signal-on:#0b1220;
+  --app:#38bdf8;
+  --ok:#4ade80;
+  --alert:#f87171;
+  --warn:#fbbf24;
+  --glow-ok:rgba(74,222,128,.16);
+  --glow-warn:rgba(251,191,36,.16);
+  --glow-app:rgba(56,189,248,.16);
+  --glow-alert:rgba(248,113,113,.16);
+  --chrome-a:rgba(11,18,32,.96);
+  --chrome-b:rgba(11,18,32,.72);
+  --notes-text:#cddaea;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--ink);color:var(--text);
+  font-family:var(--body);line-height:1.55;
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+
+/* ── chrome : la barre d'état du deck ─────────────────────────────────── */
+.chrome{
+  position:fixed;top:0;left:0;right:0;height:44px;z-index:50;
+  display:flex;align-items:center;gap:18px;padding:0 24px;
+  background:linear-gradient(180deg,var(--chrome-a),var(--chrome-b));
+  border-bottom:1px solid var(--line);
+  font-family:var(--display);font-size:15px;letter-spacing:.12em;text-transform:uppercase;
+}
+.chrome .brand{font-weight:700;color:var(--text)}
+.chrome .brand em{font-style:normal;color:var(--signal)}
+/* Bandeau d'état du pipeline : dérivé de data-ci sur la slide courante
+   (green|running|failed), même logique que le bandeau réseau du MP4. */
+.ci{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0;
+    text-transform:none;color:var(--ok)}
+body[data-ci="running"] .ci{color:var(--app);animation:pulse 1.6s infinite}
+body[data-ci="failed"] .ci{color:var(--alert)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.chrome .spacer{flex:1}
+.chrome .hint{color:var(--muted);font-size:12px;letter-spacing:.08em}
+.chrome .hint kbd{
+  font-family:var(--mono);font-size:11px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--text);
+}
+
+.bar{position:fixed;top:44px;left:0;height:2px;background:var(--signal);z-index:51;transition:width .28s ease}
+
+/* ── slides ─────────────────────────────────────────────────────────────── */
+.deck{position:relative;height:100vh;padding-top:44px}
+.slide{
+  position:absolute;inset:44px 0 0 0;display:none;
+  padding:44px clamp(32px,6vw,90px) 64px;
+  overflow-y:auto;
+}
+.slide.on{display:block;animation:in .34s cubic-bezier(.2,.7,.3,1) both}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.eyebrow{
+  font-family:var(--display);font-size:15px;font-weight:600;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--signal);
+  display:flex;align-items:center;gap:12px;margin-bottom:10px;
+}
+.eyebrow .num{
+  font-family:var(--mono);font-size:12px;letter-spacing:0;color:var(--signal-on);
+  background:var(--signal);border-radius:3px;padding:2px 7px;font-weight:500;
+}
+h1{
+  font-family:var(--display);font-weight:700;letter-spacing:-.01em;
+  font-size:clamp(34px,5.2vw,62px);line-height:1.02;margin:0 0 14px;
+  text-transform:uppercase;
+}
+.lede{font-size:clamp(16px,1.5vw,20px);color:var(--muted);max-width:74ch;margin:0 0 34px}
+h2{font-family:var(--display);text-transform:uppercase;letter-spacing:.06em;font-size:22px;margin:0 0 12px}
+
+/* grilles */
+.cols{display:grid;gap:20px}
+.c2{grid-template-columns:repeat(2,1fr)}
+.c3{grid-template-columns:repeat(3,1fr)}
+.c4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:900px){.c2,.c3,.c4{grid-template-columns:1fr}}
+
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+:root[data-theme="dark"] .card{box-shadow:none}
+.card h3{
+  font-family:var(--display);text-transform:uppercase;letter-spacing:.08em;
+  font-size:17px;margin:0 0 8px;color:var(--text);
+}
+.card p{margin:0;color:var(--muted);font-size:15px}
+.card.hi{border-color:var(--signal);background:linear-gradient(180deg,var(--signal-soft),transparent)}
+
+/* le device signature : une ligne d'état */
+.row{
+  display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+  border-radius:10px;padding:14px 18px;margin-bottom:10px;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+:root[data-theme="dark"] .row{box-shadow:none}
+.row .tag{
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  background:var(--panel-2);border-radius:4px;padding:3px 8px;white-space:nowrap;
+}
+.row .body{font-size:15px}
+.row .body b{font-weight:600}
+.row .body span{color:var(--muted);margin-left:.55em}
+.row .state{font-family:var(--display);text-transform:uppercase;letter-spacing:.1em;font-size:13px;font-weight:600}
+.row.ok{border-left-color:var(--ok)} .row.ok .state{color:var(--ok)}
+.row.warn{border-left-color:var(--warn)} .row.warn .state{color:var(--warn)}
+.row.bad{border-left-color:var(--alert)} .row.bad .state{color:var(--alert)}
+.row.app{border-left-color:var(--app)} .row.app .state{color:var(--app)}
+
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{
+  text-align:left;font-family:var(--display);text-transform:uppercase;letter-spacing:.1em;
+  font-size:13px;color:var(--signal);padding:0 14px 10px 0;border-bottom:1px solid var(--line);font-weight:600;
+}
+td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line-soft);vertical-align:top}
+td:first-child{color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+code,.mono{font-family:var(--mono);font-size:.92em;color:var(--app)}
+pre{
+  font-family:var(--mono);font-size:13.5px;line-height:1.65;color:var(--text);
+  background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--app);
+  border-radius:10px;padding:16px 18px;overflow-x:auto;margin:0;
+}
+pre .k{color:var(--signal)} pre .c{color:var(--muted)} pre .s{color:var(--ok)}
+
+ul.clean{list-style:none;padding:0;margin:0}
+ul.clean li{padding:9px 0 9px 26px;position:relative;color:var(--muted);font-size:15.5px;border-bottom:1px solid var(--line-soft)}
+ul.clean li:last-child{border-bottom:0}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--signal);font-size:14px}
+ul.clean li b{color:var(--text);font-weight:600}
+
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .n{font-family:var(--display);font-size:clamp(40px,6vw,74px);line-height:.9;font-weight:700;color:var(--signal)}
+.stat .n.app{color:var(--app)} .stat .n.ok{color:var(--ok)}
+.stat .l{font-family:var(--display);text-transform:uppercase;letter-spacing:.14em;font-size:14px;color:var(--muted)}
+
+.flow{display:flex;flex-direction:column;gap:0}
+.step{display:grid;grid-template-columns:52px 1fr;gap:18px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.step:last-child{border-bottom:0}
+.step .i{
+  font-family:var(--mono);font-size:13px;color:var(--signal);border:1px solid var(--signal);
+  border-radius:6px;height:30px;display:grid;place-items:center;
+}
+.step .t b{display:block;font-size:16px;margin-bottom:2px}
+.step .t span{color:var(--muted);font-size:14.5px}
+
+.callout{
+  border-left:3px solid var(--signal);background:var(--signal-soft);
+  border-radius:0 10px 10px 0;padding:16px 20px;margin-top:24px;font-size:15.5px;
+}
+.callout b{color:var(--signal)}
+.callout.bug{border-left-color:var(--alert);background:linear-gradient(180deg,var(--glow-alert),transparent)}
+.callout.bug b{color:var(--alert)}
+
+.foot{
+  position:fixed;bottom:0;left:0;right:0;height:38px;display:flex;align-items:center;
+  padding:0 24px;gap:16px;border-top:1px solid var(--line);background:var(--ink);
+  font-family:var(--display);text-transform:uppercase;letter-spacing:.12em;font-size:12.5px;color:var(--muted);
+}
+.foot .spacer{flex:1}
+.foot .idx{font-family:var(--mono);letter-spacing:0;color:var(--text)}
+
+/* notes présentateur */
+.notes{
+  display:none;position:fixed;left:0;right:0;bottom:38px;max-height:46vh;overflow-y:auto;
+  background:var(--panel-2);border-top:2px solid var(--signal);padding:20px 24px 24px;z-index:40;
+}
+body.notes-on .notes.on{display:block}
+.notes h4{
+  font-family:var(--display);text-transform:uppercase;letter-spacing:.14em;font-size:13px;
+  color:var(--signal);margin:0 0 10px;
+}
+.notes p{margin:0 0 10px;font-size:15px;color:var(--notes-text);max-width:100ch}
+.notes p:last-child{margin-bottom:0}
+.notes .q{color:var(--muted);font-size:14px;border-left:2px solid var(--line);padding-left:12px}
+
+/* vue plan */
+.plan{
+  display:none;position:fixed;inset:44px 0 0 0;z-index:60;background:var(--ink);
+  overflow-y:auto;padding:28px clamp(24px,4vw,56px) 60px;
+}
+body.plan-on .plan{display:block}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.plan-item{
+  text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:14px 16px;cursor:pointer;color:var(--text);font-family:var(--body);
+}
+.plan-item:hover,.plan-item:focus-visible{border-color:var(--signal);outline:none}
+.plan-item .n{font-family:var(--mono);font-size:11px;color:var(--signal)}
+.plan-item .t{font-family:var(--display);text-transform:uppercase;font-size:15px;letter-spacing:.04em;margin-top:4px}
+
+/* slide de titre */
+.title-slide{display:grid;place-content:center;text-align:left;height:calc(100vh - 120px)}
+.title-slide h1{font-size:clamp(48px,9vw,120px);margin-bottom:6px}
+.title-slide .sub{font-family:var(--display);text-transform:uppercase;letter-spacing:.22em;font-size:clamp(15px,1.7vw,20px);color:var(--app)}
+.title-slide .rule{width:120px;height:3px;background:var(--signal);margin:26px 0}
+.title-slide .who{font-size:17px;color:var(--muted)}
+.title-slide .who b{color:var(--text);font-weight:600}
+.title-slide h1 .mark{
+  display:inline-block;overflow:hidden;vertical-align:baseline;
+  width:.86em;height:.86em;margin-left:.30em;border-radius:22%;
+  background:var(--app);box-shadow:0 14px 30px -14px var(--app);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+.title-slide h1 .mark svg{display:block;width:62%;height:62%;margin:19%;stroke:var(--ink)}
+
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.slide.on{animation:none}.ci{animation:none!important}}
+
+@media print{
+  :root{color-scheme:light}
+  body{overflow:visible;background:#fff;color:var(--text)}
+  .chrome,.foot,.bar,.plan{display:none}
+  .deck{height:auto;padding:0}
+  .slide{position:static;display:block!important;page-break-after:always;inset:auto;padding:28px}
+  .card,pre,.row{break-inside:avoid}
+  body.notes-on .notes.on{display:block;position:static;max-height:none}
+}
+</style>
+</head>
+<body data-ci="green">
+
+<div class="chrome">
+  <span class="brand">Logi<em>Chain</em> Infra</span>
+  <span class="ci"><span id="ciLabel">● CI verte · deploy #47</span></span>
+  <span class="spacer"></span>
+  <span class="hint"><kbd>←</kbd><kbd>→</kbd> naviguer · <kbd>N</kbd> notes · <kbd>P</kbd> plan · <kbd>T</kbd> thème</span>
+</div>
+<div class="bar" id="bar" style="width:0"></div>
+
+<main class="deck" id="deck">
+
+<!-- 01 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Titre" data-ci="green">
+  <div class="title-slide">
+    <div class="sub">Module MP5 · Industrialisation et passation</div>
+    <h1>LogiChain<br>Infra<span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg></span></h1>
+    <div class="rule"></div>
+    <p class="who"><b>Clara Morin</b> · La MANU (NOVEI) · 2026<br>
+    Ansible · GitHub Actions · passation d'une plateforme événementielle</p>
+  </div>
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Salue, présente-toi en une phrase. Situe le module : après l'API (MP3) et l'application mobile (MP4), ce troisième volet ne montre presque aucune fonctionnalité nouvelle — il montre que les deux premières sont <b>livrables à une équipe qui n'existe pas encore</b>.</p>
+    <p>Annonce le fil rouge tout de suite : « je ne vais pas vous convaincre en listant des outils. Je vais vous montrer une machine détruite et reconstruite en 1 minute 36, quatre bugs réels que j'ai rencontrés et corrigés, et les limites que j'assume plutôt que de laisser découvrir. »</p>
+  </div>
+</section>
+
+<!-- 02 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Le problème" data-ci="green">
+  <div class="eyebrow"><span class="num">01</span> Le problème</div>
+  <h1>Une app qui marche<br>≠ une app transmissible</h1>
+  <p class="lede">L'API et l'app mobile fonctionnent, en démonstration, sur ma machine, déployées à la main. C'est exactement le point faible que ce module vient combler.</p>
+
+  <div class="cols c3">
+    <div class="card"><h3>Ce que MP3 + MP4 prouvent</h3><p>Le code est correct : architecture en couches, tests, sécurité applicative. Ça répond à « est-ce que ça marche ? ».</p></div>
+    <div class="card"><h3>Ce qu'ils ne prouvent pas</h3><p>Que quelqu'un d'autre que moi peut le déployer, le reconstruire après une panne, ou y toucher sans casser la production.</p></div>
+    <div class="card hi"><h3>La vraie question de MP5</h3><p>Si je disparais du projet demain, une autre personne peut-elle reprendre, en combien de temps, avec quels documents ?</p></div>
+  </div>
+
+  <div class="callout">Un déploiement fait à la main, une seule fois, par la seule personne qui connaît le projet : ce n'est pas un déploiement, c'est un <b>secret</b>. L'industrialisation, c'est transformer ce secret en procédure reproductible et documentée.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Ne présente pas ça comme un aveu de faiblesse du MP3/MP4 : c'était hors périmètre de ces modules, dont le sujet portait sur l'API et l'app, pas sur l'infrastructure. Ici, c'est le sujet.</p>
+    <p class="q">Si on demande « comment déployiez-vous avant ce module ? » : à la main, sur un poste de développement, sans procédure écrite ni preuve de reproductibilité. C'est précisément ce point de départ que la slide suivante détaille.</p>
+  </div>
+</section>
+
+<!-- 03 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Le point de départ" data-ci="green">
+  <div class="eyebrow"><span class="num">02</span> Point de départ</div>
+  <h1>Ce qui existait<br>avant ce module</h1>
+
+  <div class="cols c2">
+    <div>
+      <h2 style="color:var(--ok)">Acquis des modules précédents</h2>
+      <ul class="clean">
+        <li><b>logichain-api</b> : API REST Node.js/TypeScript, MongoDB, architecture N-Tier, 65 tests</li>
+        <li><b>LogiChainMobile</b> : application React Native, offline-first, 633 tests</li>
+        <li>Les deux consomment le même contrat d'API, sans modification depuis MP3</li>
+      </ul>
+    </div>
+    <div>
+      <h2 style="color:var(--muted)">Ce qui manquait</h2>
+      <ul class="clean">
+        <li><b>Aucun provisionnement automatisé</b> : la cible était configurée à la main</li>
+        <li><b>Aucune CI/CD</b> : aucun contrôle avant fusion, aucun déploiement déclenché</li>
+        <li><b>Aucune protection Git</b> : rien n'empêchait un push direct sur la branche livrée</li>
+        <li><b>Aucun document de passation</b> : le projet tenait dans une seule tête</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">Ce module ajoute un <b>troisième dépôt</b>, <code>logichain-infra</code>, dédié à ce manque. Il ne touche ni au code de l'API ni à celui de l'app : il les provisionne, les déploie, et documente comment quelqu'un d'autre en fait autant.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Cette slide sert de repère commun avec le jury qui a suivi MP3 et MP4 : dis explicitement « ceci, vous le connaissez déjà ; ceci est nouveau ».</p>
+    <p class="q">Si on demande pourquoi ne pas avoir fait ça dès le MP3 : le sujet de MP3 portait sur l'architecture de l'API elle-même, pas sur son exploitation. Traiter l'infrastructure en étalant les responsabilités sur trois modules distincts, c'est aussi une décision de découpage assumée — chaque module a un objet clair.</p>
+  </div>
+</section>
+
+<!-- 04 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Quatre objectifs" data-ci="green">
+  <div class="eyebrow"><span class="num">03</span> Ce que le sujet demande</div>
+  <h1>Quatre objectifs</h1>
+  <p class="lede">Chacun se traduit par une décision d'architecture précise, démontrée dans la suite.</p>
+
+  <div class="row app"><span class="tag">objectif 1</span><span class="body"><b>Provisionner et déployer automatiquement</b> <span>de la machine vierge au service qui répond</span></span><span class="state">Ansible</span></div>
+  <div class="row app"><span class="tag">objectif 2</span><span class="body"><b>Vérifier avant de fusionner</b> <span>lint, syntaxe, secrets, à chaque Pull Request</span></span><span class="state">CI</span></div>
+  <div class="row app"><span class="tag">objectif 3</span><span class="body"><b>Déployer en continu, en confiance</b> <span>chaque fusion sur <code>main</code> se prouve elle-même</span></span><span class="state">CD</span></div>
+  <div class="row app"><span class="tag">objectif 4</span><span class="body"><b>Rendre le projet transmissible</b> <span>Gitflow, protections, Runbook, procédures de passation</span></span><span class="state">documentation</span></div>
+
+  <div class="callout">Le fil conducteur de toute la présentation : chaque objectif est <b>prouvé</b>, pas seulement décrit. Une capture d'écran ou une commande rejouée en direct pour chacun.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Lis les quatre vite, annonce le plan : Gitflow et gouvernance d'abord (parce que sans ça, rien de ce qui suit n'est fiable), puis Ansible et les rôles, puis CI/CD, puis exploitation.</p>
+  </div>
+</section>
+
+<!-- 05 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="La contrainte" data-ci="green">
+  <div class="eyebrow"><span class="num">04</span> La contrainte de départ</div>
+  <h1>Pourquoi la cible<br>est une machine vierge</h1>
+  <p class="lede">Une décision structurante, prise avant d'écrire la moindre tâche Ansible, et qui explique presque tous les choix qui suivent.</p>
+
+  <div class="cols c2">
+    <div class="card hi">
+      <h3>Le VPS existant est mutualisé</h3>
+      <p>J'ai un VPS OVH réel, déjà en production pour d'autres projets, avec Docker et Traefik installés pour router plusieurs applications sur les mêmes ports 80/443. Y installer Nginx en direct entrerait en <b>conflit de ports</b> avec l'existant, et un rôle Ansible qui réécrit sa configuration système risquerait un projet qui n'est pas le mien.</p>
+    </div>
+    <div class="card">
+      <h3>La solution : une cible neutre</h3>
+      <p>Le playbook est écrit pour une machine <b>dédiée et vierge</b> : Ubuntu 24.04 fraîche, sans rien d'installé. En local, c'est une VM Multipass. En CI/CD, c'est un runner GitHub jetable. Le VPS mutualisé reste un <b>futur inventaire</b> (<code>prod</code>), pas la cible d'aujourd'hui.</p>
+    </div>
+  </div>
+
+  <div class="callout">Cette contrainte est la raison directe de la <b>slide 19</b> : si le playbook ne fonctionne que sur une machine déjà à moitié configurée par moi, il ne prouve rien. Il doit fonctionner sur une machine qui n'a jamais rien vu — c'est ce que je démontre en direct.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Assume-la comme une décision d'ingénieur, pas comme une excuse. Le jury connaît probablement ce genre de contrainte réelle (VPS mutualisé, budget limité) : elle rend le projet plus crédible, pas moins.</p>
+    <p class="q">Si on demande « pourquoi ne pas avoir pris un second VPS ? » : coût, pour un projet noté sans budget dédié. Multipass et le runner GitHub Actions sont gratuits et suffisent à prouver l'automatisation ; le jour où un vrai budget existe, le même playbook s'applique tel quel à un VPS dédié — c'est justement l'intérêt d'un provisionnement scripté plutôt que manuel.</p>
+  </div>
+</section>
+
+<!-- 06 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Trois dépôts" data-ci="green">
+  <div class="eyebrow"><span class="num">05</span> Organisation du code</div>
+  <h1>Trois dépôts,<br>trois responsabilités</h1>
+
+  <table style="margin-bottom:22px">
+    <tr><th>Dépôt</th><th>Contenu</th><th>Ce que sa CI vérifie</th></tr>
+    <tr><td><code>logichain-api</code></td><td>API REST Node.js/TypeScript</td><td>Qualité et tests (65 → 71 tests, couverture) · Détection de secrets</td></tr>
+    <tr><td><code>LogiChainMobile</code></td><td>Application React Native</td><td>Qualité et tests · Détection de secrets</td></tr>
+    <tr><td><code>logichain-infra</code></td><td>Provisionnement Ansible, CI/CD</td><td>Lint et secrets (yamllint, ansible-lint, syntaxe, gitleaks)</td></tr>
+  </table>
+
+  <div class="callout">L'argument n'est pas « trois dépôts, c'est plus propre ». C'est que <b>chaque dépôt n'exige que ce qui le concerne réellement</b> : <code>logichain-infra</code> n'a pas de suite de tests applicatifs, donc son ruleset n'exige pas le check « Qualité et tests » — l'exiger aurait bloqué toute Pull Request en attente d'un contrôle qui ne peut techniquement pas se déclencher. Trois dépôts, trois cycles de vie, trois exigences de vérification adaptées, plutôt qu'un monorepo où un seul jeu de règles s'appliquerait mal à tout le monde.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Le tableau, colonne de droite, est ta preuve : les rulesets réels des trois dépôts n'exigent pas les mêmes checks, précisément parce que <code>logichain-infra</code> n'a rien à tester au sens applicatif. C'est vérifiable dans <code>soutenance/preuves/rulesets-full.json</code>.</p>
+    <p class="q">Si on demande « pourquoi pas un monorepo ? » : trois cycles de déploiement différents (l'API se déploie, l'app se publie, l'infra se provisionne) et trois historiques de commits qui n'ont pas de raison de se mélanger. Le lien entre eux, c'est <code>CONTRIBUTING.md</code>, partagé à l'identique dans les trois.</p>
+  </div>
+</section>
+
+<!-- 07 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Gitflow" data-ci="green">
+  <div class="eyebrow"><span class="num">06</span> Gouvernance</div>
+  <h1>Gitflow simplifié</h1>
+
+<pre>main        ●───────────────●───────────●───────────►  <span class="c">(livrable — un push déclenche cd.yml)</span>
+             \               \           \
+develop       ●───●───●───●───●───●───●───●─────────►  <span class="c">(intégration continue)</span>
+               \   \       \
+feature/*       ●───●       ●─────────►  <span class="c">(une évolution, courte durée de vie)</span>
+
+hotfix/*    <span class="c">part de main, revient sur main ET develop</span></pre>
+
+  <div class="cols c2" style="margin-top:22px">
+    <div class="card"><h3><code>main</code></h3><p>Reflète toujours l'état livrable. Historique linéaire imposé. <b>Un push y déclenche le déploiement continu</b> — jamais de push direct, toujours par Pull Request fusionnée.</p></div>
+    <div class="card"><h3><code>develop</code></h3><p>Branche d'intégration : tous les <code>feature/*</code> y fusionnent avant de partir vers <code>main</code>.</p></div>
+  </div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Le schéma se lit comme celui de MP3/MP4, s'ils en avaient un — insiste sur la spécificité infra : un push sur <code>main</code> n'est pas anodin ici, il <b>déploie réellement</b>. C'est pour ça que <code>main</code> est la branche la plus protégée des trois dépôts.</p>
+    <p class="q">Si on demande pourquoi pas de <code>release/*</code> classique du Gitflow historique : le projet n'a pas de cycle de release séparé de la fusion vers <code>main</code> — chaque fusion vers <code>main</code> EST une release, déployée immédiatement. Ajouter une branche <code>release/*</code> intermédiaire n'aurait rien apporté à l'échelle du projet.</p>
+  </div>
+</section>
+
+<!-- 08 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Protections" data-ci="running">
+  <div class="eyebrow"><span class="num">07</span> Gouvernance</div>
+  <h1>Un push direct<br>ne passe pas</h1>
+  <p class="lede">Six rulesets GitHub actifs — deux par dépôt (<code>protection-main</code>, <code>protection-develop</code>) — empêchent toute évolution du code hors Pull Request.</p>
+
+<pre><span class="c">$ git push origin main</span>
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote:
+remote: - Changes must be made through a pull request.
+remote:
+remote: - 2 of 2 required status checks are expected.
+remote:
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/Fulkiaaa/logichain-api.git'</pre>
+
+  <div class="cols c2" style="margin-top:22px">
+    <div class="card">
+      <h3>Ce que chaque ruleset impose</h3>
+      <p>Suppression et non-fast-forward interdits, historique linéaire sur <code>main</code>, threads de revue résolus, et le check requis vert avant fusion. <b>Aucun acteur de contournement</b> (<code>bypass_actors: []</code>) — la règle s'applique aussi à la propriétaire du dépôt.</p>
+    </div>
+    <div class="card hi">
+      <h3>La revue différée, assumée</h3>
+      <p><code>required_approving_review_count</code> vaut <b>0</b> aujourd'hui : projet en solo, et GitHub interdit d'approuver sa propre Pull Request — l'exiger à 1 aurait bloqué toute fusion. Documenté dans <code>CONTRIBUTING.md</code> §8 : c'est la <b>première action</b> de la passation, dès un second contributeur.</p>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>La capture est réelle : <code>soutenance/preuves/push-rejete-api-main.txt</code>, un push direct tenté sur <code>logichain-api</code> pendant la Tâche 13. Précise que c'est un test délibéré, pas un accident.</p>
+    <p>Le bandeau du deck passe en « CI en cours » sur cette slide : c'est l'état réel capturé dans <code>pr-develop-main-blocked.json</code>, une Pull Request bloquée parce que ses checks étaient encore <code>IN_PROGRESS</code> — pas en échec, simplement pas encore terminés. La même Pull Request redevient <code>CLEAN</code> une fois les checks au vert (<code>pr-develop-main-green.json</code>).</p>
+    <p class="q">Si on demande « et si le check tombe en panne durablement ? » : <code>CONTRIBUTING.md</code> §9 documente la procédure d'urgence — désactiver temporairement le ruleset depuis l'interface ou en ligne de commande, jamais pour contourner un échec légitime, toujours réactivé ensuite.</p>
+    <p class="q">Si on demande pourquoi 0 approbation n'est pas une faille : parce que la contrepartie existe déjà ailleurs — le check CI obligatoire, gitleaks, et le fait que la propriétaire elle-même ne peut pas contourner le ruleset. Ce n'est pas « aucune protection », c'est « la protection humaine viendra avec l'équipe ».</p>
+  </div>
+</section>
+
+<!-- 09 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Conventional Commits" data-ci="green">
+  <div class="eyebrow"><span class="num">08</span> Gouvernance</div>
+  <h1>Un hook natif,<br>pas Husky</h1>
+  <p class="lede">Les trois dépôts partagent la même convention (<code>&lt;type&gt;(&lt;portée&gt;): &lt;résumé&gt;</code>), mais <code>logichain-infra</code> l'applique différemment, pour une raison concrète.</p>
+
+  <div class="cols c2">
+    <div class="card">
+      <h3>Pourquoi pas Husky ici</h3>
+      <p><code>logichain-api</code> et <code>LogiChainMobile</code> installent Husky, qui a besoin d'un <code>package.json</code> déjà présent chez eux. <code>logichain-infra</code> est un <b>dépôt Ansible pur</b> : en ajouter un uniquement pour Husky introduirait une dépendance Node.js superflue.</p>
+    </div>
+    <div class="card hi">
+      <h3>Le hook réel</h3>
+      <p><code>.githooks/commit-msg</code>, un script shell versionné sans dépendance, activé une fois par clone (<code>git config core.hooksPath .githooks</code>). <code>commitlint.config.js</code> reste présent pour la cohérence documentaire, mais ce n'est pas lui qui bloque.</p>
+    </div>
+  </div>
+
+<pre><span class="c">$ git commit -m "message invalide sans type"</span>
+✖ Message de commit invalide : « message invalide sans type »
+  Format attendu : &lt;type&gt;(&lt;portée optionnelle&gt;): &lt;résumé&gt;
+[rejeté, exit 1]
+
+<span class="c">$ git commit -m "docs: test du hook commit-msg"</span>
+[main (root-commit) 774f6fc] docs: test du hook commit-msg
+[accepté, exit 0]</pre>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>La sortie ci-dessus vient réellement du Runbook (§10.3) : testée dans un dépôt Git jetable avec une copie du même hook, pour ne prendre aucun risque sur l'historique réel.</p>
+    <p class="q">Si on demande pourquoi ne pas avoir simplement créé un <code>package.json</code> vide pour Husky : ça aurait fonctionné, mais introduit un outillage Node.js (npm install, node_modules) dans un projet qui n'en a besoin nulle part ailleurs — un coût de maintenance pour un seul hook. Le script shell fait exactement la même vérification avec zéro dépendance.</p>
+  </div>
+</section>
+
+<!-- 10 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Passation" data-ci="green">
+  <div class="eyebrow"><span class="num">09</span> Passation</div>
+  <h1>README, CONTRIBUTING,<br>CODEOWNERS</h1>
+
+  <div class="cols c3">
+    <div class="card"><h3>README.md</h3><p>Prérequis, installation, variables et secrets (sans valeur), commandes utiles. Pensé pour quelqu'un qui clone le dépôt aujourd'hui, sans contexte oral.</p></div>
+    <div class="card"><h3>CONTRIBUTING.md</h3><p>Modèle de branches, convention de commit, cycle de vie d'une PR, checklist de revue, et la procédure de passation elle-même (§8) — commande <code>gh</code> exacte pour relever la revue à 1 approbation.</p></div>
+    <div class="card"><h3>CODEOWNERS</h3><p><code>* @Fulkiaaa</code> aujourd'hui — un seul propriétaire sur tout le dépôt, prêt à se subdiviser par répertoire (par rôle Ansible) le jour où une équipe existe.</p></div>
+  </div>
+
+  <div class="callout">Le gabarit de Pull Request (<code>.github/PULL_REQUEST_TEMPLATE.md</code>) force à répondre à quatre questions avant même d'ouvrir la PR : quoi, quel type, quelles vérifications, comment tester. Une passation qui fonctionne, c'est une passation où <b>chaque document répond à une question que la personne suivante va se poser</b>, pas une déclaration d'intention.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Ne lis pas les trois cartes mot à mot : dis plutôt <b>pourquoi</b> ces trois documents et pas un seul gros fichier. README répond à « comment je démarre », CONTRIBUTING à « comment je contribue sans casser les règles », CODEOWNERS à « qui prévenir ». Trois questions, trois fichiers.</p>
+    <p class="q">Si on demande ce qui manque encore pour une vraie passation : le Runbook (slide 24) couvre l'exploitation ; ce qui reste hors dépôt, c'est le mot de passe du vault lui-même, transmis hors dépôt par nature — voir la procédure §10.2 du Runbook.</p>
+  </div>
+</section>
+
+<!-- 11 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Ansible" data-ci="green">
+  <div class="eyebrow"><span class="num">10</span> Choix technique</div>
+  <h1>Ansible,<br>pas Terraform</h1>
+  <p class="lede">Les deux outils sont complémentaires plus que concurrents, mais un seul répond à la contrainte réelle de ce projet : configurer une machine qui existe déjà.</p>
+
+  <table>
+    <tr><th>Besoin</th><th>Terraform</th><th>Ansible</th></tr>
+    <tr><td>Rôle typique</td><td>Créer/détruire des <b>ressources cloud</b> (VM, réseau, DNS…) via une API de provider</td><td>Configurer un <b>système déjà existant</b> : paquets, utilisateurs, fichiers, services</td></tr>
+    <tr><td>Accès requis à la cible</td><td>API du cloud provider</td><td><b>SSH</b> seul, agentless</td></tr>
+    <tr><td>Adapté à un VPS mutualisé sans API dédiée</td><td style="color:var(--alert)">non — rien à créer, la VM existe déjà</td><td style="color:var(--ok)">oui — c'est exactement ce cas</td></tr>
+    <tr><td>Modules pour Node.js, MongoDB, Nginx, UFW</td><td>indirect (scripts, provisioners)</td><td>natifs, idempotents par construction</td></tr>
+  </table>
+
+  <div class="callout">La cible de ce projet, qu'elle soit une VM Multipass locale ou un futur VPS OVH, <b>existe déjà</b> — il n'y a rien à provisionner au sens cloud. Le besoin est de la <b>configurer</b> de façon reproductible : c'est le métier d'Ansible, pas de Terraform.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Ne dénigre pas Terraform : les deux sont utilisés ensemble dans beaucoup de projets réels (Terraform crée la VM, Ansible la configure). Ici, la VM est créée par Multipass en une commande ou existe déjà (VPS OVH) : il n'y a pas de couche de provisionnement cloud à automatiser.</p>
+    <p class="q">Si on demande « et si demain vous passez sur AWS ? » : Terraform prendrait alors tout son sens pour créer l'instance ; le playbook Ansible, lui, resterait identique — il ne connaît que du SSH et un système Ubuntu 24.04, peu importe qui l'a créé.</p>
+  </div>
+</section>
+
+<!-- 12 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Cinq rôles" data-ci="green">
+  <div class="eyebrow"><span class="num">11</span> Architecture Ansible</div>
+  <h1>Cinq rôles,<br>un seul playbook</h1>
+
+  <div class="flow">
+    <div class="step"><span class="i">1</span><span class="t"><b>system_security</b><span>utilisateur de service, durcissement SSH, pare-feu UFW, Fail2Ban, mises à jour automatiques</span></span></div>
+    <div class="step"><span class="i">2</span><span class="t"><b>nodejs</b><span>dépôt NodeSource, Node.js 20, PM2 en global — le plus court des cinq</span></span></div>
+    <div class="step"><span class="i">3</span><span class="t"><b>database</b><span>MongoDB 8.0 en replica set à un membre, amorçage de l'authentification, index, sauvegarde quotidienne</span></span></div>
+    <div class="step"><span class="i">4</span><span class="t"><b>web_proxy</b><span>Nginx 1.24, TLS, vhost, en-têtes de sécurité</span></span></div>
+    <div class="step"><span class="i">5</span><span class="t"><b>app_runtime</b><span>code applicatif, build TypeScript, <code>.env</code>, PM2 sous systemd</span></span></div>
+  </div>
+
+  <div class="callout"><code>site.yml</code> les enchaîne dans cet ordre exact : chaque rôle suppose que le précédent est en place (Nginx proxifie vers l'API, l'API se connecte à Mongo). L'ordre n'est pas arbitraire, il reflète les dépendances réelles.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Vue d'ensemble rapide, une phrase par rôle. Les slides suivantes détaillent quatre d'entre eux ; <code>nodejs</code> n'a pas de slide dédiée parce que c'est littéralement six tâches sans piège particulier — l'installer, en dire un mot suffit.</p>
+    <p class="q">Si on demande la taille relative : <code>app_runtime</code> et <code>database</code> sont les plus longs (build applicatif et amorçage MongoDB), <code>nodejs</code> le plus court.</p>
+  </div>
+</section>
+
+<!-- 13 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="System &amp; Security" data-ci="failed">
+  <div class="eyebrow"><span class="num">12</span> Rôle : system_security</div>
+  <h1>L'ordre du pare-feu<br>n'est pas arbitraire</h1>
+
+  <div class="cols c2">
+    <div class="card hi">
+      <h3>Le piège évité</h3>
+      <p>Les autorisations de ports (22, 80, 443) sont posées <b>avant</b> la politique <code>deny incoming</code> et <b>avant</b> l'activation d'UFW. Inverser cet ordre coupe la session SSH en cours au moment même de l'activation du pare-feu — la machine devient inaccessible, il faut la détruire et recommencer.</p>
+    </div>
+    <div class="card">
+      <h3>Le reste du rôle</h3>
+      <p>Utilisateur de service sans mot de passe (accès par clé uniquement), configuration SSH validée avant écriture (<code>validate: sshd -t -f %s</code> — une faute de frappe ne coupe jamais l'accès), Fail2Ban sur sshd, mises à jour de sécurité automatiques.</p>
+    </div>
+  </div>
+
+  <div class="callout bug"><b>Bug rencontré sur machine vraiment vierge.</b> <code>sshd -t</code> exige que <code>/run/sshd</code> existe pour valider une configuration — même en lecture seule. Sur la VM Multipass, ce répertoire existe déjà (sshd tourne en continu depuis le premier démarrage). Sur un runner GitHub neuf, <code>/run</code> est un tmpfs vierge et sshd n'a jamais démarré : la validation échouait avec <code>Missing privilege separation directory: /run/sshd</code>. Corrigé en créant ce répertoire explicitement avant la validation — invisible en local, systématique en CI.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>C'est le premier des bugs de machine vierge que tu racontes en détail : garde-le concret, il illustre parfaitement pourquoi un second environnement (le runner CI) a une valeur qu'une seule VM familière n'a pas.</p>
+    <p class="q">Si on demande pourquoi ne pas avoir découvert ça en local d'abord : parce qu'en local, la VM avait déjà démarré sshd au moins une fois avant que ce rôle ne soit rejoué — le bug ne se manifeste que sur une machine qui n'a <b>jamais</b> eu de sshd actif, ce qu'un runner GitHub neuf est à chaque exécution et qu'une VM de développement réutilisée n'est presque jamais.</p>
+  </div>
+</section>
+
+<!-- 14 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Database" data-ci="green">
+  <div class="eyebrow"><span class="num">13</span> Rôle : database</div>
+  <h1>MongoDB en replica set<br>à un seul membre</h1>
+  <p class="lede">Un choix qui surprend au premier regard : un replica set d'un seul nœud n'apporte aucune tolérance de panne. Il existe pour une autre raison.</p>
+
+  <div class="cols c2">
+    <div class="card hi">
+      <h3>Pourquoi <code>rs0</code> quand même</h3>
+      <p>L'API exige <code>?replicaSet=rs0</code> dans son URI de connexion pour ses <b>transactions multi-documents</b> (l'allocation ACID présentée en MP3). MongoDB ne les autorise qu'en replica set. Le module <code>mongodb_replicaset</code> valide par défaut au moins 3 membres votants : désactivé explicitement (<code>validate: false</code>), documenté en commentaire pour la prochaine personne qui lira ce rôle.</p>
+    </div>
+    <div class="card">
+      <h3>L'amorçage, en deux temps</h3>
+      <p>1. <code>mongod</code> démarre <b>sans authentification</b>, le replica set s'initie, l'administrateur et l'utilisateur applicatif sont créés. 2. <code>mongod</code> redémarre <b>avec authentification activée</b>. Un marqueur sur disque (<code>.ansible-bootstrapped</code>) garantit que cette phase ne se rejoue jamais après le premier passage.</p>
+    </div>
+  </div>
+
+  <div class="callout">Deux index applicatifs créés au provisionnement : <code>idx_items_qrcode</code> (unique, sur <code>items.qrCode</code> — c'est lui qui rend le scan instantané côté mobile) et <code>idx_events_status_start</code>. Le module vérifie leur existence avant d'agir : toujours joué, toujours idempotent.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Le point contre-intuitif à expliquer clairement : un replica set à un membre n'est <b>pas</b> de la haute disponibilité. Précise-le avant qu'on te pose la question, sinon elle viendra sous forme de piège.</p>
+    <p class="q">Si on demande pourquoi ne pas avoir simplement utilisé Mongo en mode standalone sans authentification inter-nœuds compliquée : parce que l'API a été conçue en MP3 pour des transactions ACID, qui exigent un replica set. Changer ça reviendrait à modifier le contrat de l'API — hors périmètre de ce module.</p>
+    <p class="q">Si on demande le rôle du <code>keyFile</code> : MongoDB exige une authentification inter-nœuds dès que <code>authorization: enabled</code> est combiné à un replica set, même à un seul membre. Généré une fois sur la cible (jamais transmis, jamais écrit sur le contrôleur), <code>force: false</code> pour qu'il ne soit jamais régénéré au passage suivant.</p>
+  </div>
+</section>
+
+<!-- 15 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Web &amp; Proxy" data-ci="green">
+  <div class="eyebrow"><span class="num">14</span> Rôle : web_proxy</div>
+  <h1>Nginx : TLS,<br>et rien d'autre exposé</h1>
+
+  <div class="cols c2">
+    <div>
+      <h2>Ce que Nginx fait</h2>
+      <ul class="clean">
+        <li><b>Termine le TLS</b> : certificat auto-signé en staging (<code>web_proxy_tls_mode: selfsigned</code>), régénéré uniquement si absent</li>
+        <li><b>Redirige</b> le port 80 vers 443</li>
+        <li><b>Proxifie</b> vers <code>127.0.0.1:3000</code>, seul port où l'API écoute</li>
+        <li><code>/health</code> exclue de la journalisation d'accès (<code>access_log off</code>)</li>
+      </ul>
+    </div>
+    <div>
+      <h2>En-têtes de sécurité déployés</h2>
+      <ul class="clean">
+        <li><code>Strict-Transport-Security</code> : <code>max-age=31536000; includeSubDomains</code></li>
+        <li><code>X-Content-Type-Options: nosniff</code></li>
+        <li><code>Referrer-Policy: strict-origin-when-cross-origin</code></li>
+        <li><code>server_tokens off</code> : version de Nginx non divulguée</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">MongoDB n'écoute que sur <code>127.0.0.1</code> : jamais exposé directement, seule l'API y accède en local. Nginx expose le <b>seul</b> point d'entrée public utile. Détail de portabilité réel : Ubuntu 24.04 fournit Nginx 1.24, où <code>http2 on;</code> séparé n'existe pas encore — la syntaxe <code>listen 443 ssl http2;</code> a été utilisée à la place, seule prise en charge par cette version.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Le détail Nginx 1.24 est un bon exemple de « portabilité vérifiée, pas supposée » : la directive la plus récente aurait fait échouer <code>nginx -t</code> sur cette version précise.</p>
+    <p class="q">Si on demande pourquoi un certificat auto-signé : la cible est une VM locale sans nom de domaine public. En production réelle (inventaire <code>prod</code>, futur), <code>web_proxy_tls_mode</code> basculerait vers un mode Let's Encrypt — pas encore implémenté, car pas encore de domaine à valider.</p>
+  </div>
+</section>
+
+<!-- 16 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Application Runtime" data-ci="failed">
+  <div class="eyebrow"><span class="num">15</span> Rôle : app_runtime</div>
+  <h1>PM2 n'a pas<br>de module Ansible</h1>
+  <p class="lede">Vérifié dans toutes les collections listées : aucune ne fournit de module PM2. Ce rôle contient donc les seules commandes du projet exécutées sans module dédié — chacune gardée selon sa nature.</p>
+
+  <table>
+    <tr><th>Commande</th><th>Garde</th><th>Pourquoi celle-ci</th></tr>
+    <tr><td><code>pm2 startup systemd</code></td><td><code>creates:</code></td><td>n'agit que si l'unité systemd n'existe pas encore</td></tr>
+    <tr><td><code>npm ci</code> / <code>npm run build</code> / <code>npm prune</code></td><td><code>when:</code> + <code>changed_when:</code></td><td>rejouées seulement si le checkout a changé, jamais de faux <code>changed=0</code> silencieux</td></tr>
+    <tr><td><code>pm2 reload</code> / <code>pm2 save</code></td><td><code>notify:</code> d'un handler</td><td>déclenchées seulement si <code>.env</code> ou la config PM2 ont réellement changé</td></tr>
+    <tr><td><code>pm2 jlist</code></td><td><code>changed_when: false</code></td><td>lecture seule, jamais un « changement »</td></tr>
+  </table>
+
+  <div class="callout bug"><b>Le bug qui a failli passer inaperçu.</b> Sur un compte applicatif qui n'a <b>jamais</b> invoqué PM2, la toute première commande démarre elle-même le démon et écrit sa bannière de démarrage (<code>[PM2] Spawning PM2 daemon…</code>) sur stdout — <b>avant</b> la sortie utile. <code>pm2 jlist</code> en aurait hérité, et son <code>from_json</code> aurait échoué avec <code>Expecting value: line 2 column 25</code>. Invisible en rejouant un rôle déjà appliqué (le démon tournait déjà) ; systématique sur machine vierge. Corrigé en insérant <code>pm2 ping</code> avant <code>pm2 jlist</code> : sa propre sortie n'est jamais analysée, peu importe qu'elle porte la bannière.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Le sujet proscrit les commandes « sans garde » — pas les commandes tout court. Dis-le explicitement si la remarque vient : chacune des quatre commandes ci-dessus est gardée selon sa nature exacte, ce n'est pas une liste de commandes brutes.</p>
+    <p>Ce bug-là, raconte-le en entier : c'est celui qui a le plus directement motivé la démonstration de reconstruction complète (slide 19). Une machine « déjà touchée une fois » ne l'aurait jamais révélé.</p>
+    <p class="q">Si on demande pourquoi ne pas parser la sortie autrement (grep, filtre plus tolérant) : parce que la bannière PM2 n'a pas de format stable garanti d'une version à l'autre — la solution robuste est de ne jamais analyser une sortie qui peut la contenir, pas de deviner son format.</p>
+  </div>
+</section>
+
+<!-- 17 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Idempotence" data-ci="green">
+  <div class="eyebrow"><span class="num">16</span> Qualité du playbook</div>
+  <h1>Rejouable sans effet,<br>vraiment</h1>
+  <p class="lede">L'idempotence n'est pas un slogan : c'est une propriété vérifiée, module par module, avec les modules natifs Ansible comme garantie de base.</p>
+
+  <div class="cols c2">
+    <div class="card">
+      <h3>Le cas général</h3>
+      <p>Chaque module Ansible utilisé (<code>apt</code>, <code>template</code>, <code>user</code>, <code>ufw</code>, <code>mongodb_user</code>, <code>mongodb_index</code>…) compare l'état déclaré à l'état réel et ne modifie rien s'ils correspondent déjà. C'est la propriété que le playbook <b>hérite</b> gratuitement, sans l'écrire soi-même.</p>
+    </div>
+    <div class="card hi">
+      <h3>Le cas assumé : PM2</h3>
+      <p>Sans module natif, l'idempotence de <code>app_runtime</code> repose sur des gardes explicites (slide précédente) plutôt que sur un module qui la garantirait tout seul. C'est la seule zone du projet où l'idempotence est <b>construite à la main</b>, pas héritée — et elle est vérifiée par la CD à chaque fusion (slide 22).</p>
+    </div>
+  </div>
+
+  <div class="callout">Preuve : un second passage complet de <code>site.yml</code> sur la même cible donne <b><code>changed=0</code></b> — aucune tâche ne modifie quoi que ce soit. Détail dans <code>soutenance/preuves/idempotence-2026-09-08.log</code>, montré en direct à la slide 19.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Distingue bien les deux sources d'idempotence : celle qu'on obtient « gratuitement » avec des modules Ansible corrects, et celle qu'il a fallu construire à la main pour PM2. Le jury doit comprendre que ce n'est pas un hasard heureux.</p>
+    <p class="q">Si on demande comment vérifier l'idempotence sans attendre un second passage complet (1 min 36) : ce n'est pas nécessaire de le faire en direct pendant la soutenance — le journal <code>idempotence-2026-09-08.log</code> en est la preuve déjà rejouée, et la CD le revérifie automatiquement à chaque fusion sur <code>main</code> (slide 22).</p>
+  </div>
+</section>
+
+<!-- 18 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Trois inventaires" data-ci="green">
+  <div class="eyebrow"><span class="num">17</span> Portabilité</div>
+  <h1>Trois inventaires,<br>un seul code</h1>
+  <p class="lede"><code>site.yml</code> et les cinq rôles ne changent jamais. Ce qui change d'un environnement à l'autre est isolé dans <code>inventories/&lt;env&gt;/group_vars/</code>.</p>
+
+  <div class="row app"><span class="tag">staging</span><span class="body"><b>VM Multipass locale</b> <span>Ubuntu 24.04, cible de référence de ce Runbook</span></span><span class="state">actif</span></div>
+  <div class="row app"><span class="tag">ci</span><span class="body"><b>Runner GitHub Actions</b> <span>Ubuntu 24.04 neuf à chaque exécution — UFW désactivé, runner jetable</span></span><span class="state">actif</span></div>
+  <div class="row warn"><span class="tag">prod</span><span class="body"><b>Futur VPS</b> <span>structure anticipée, pas encore instanciée — le VPS mutualisé actuel n'est pas cette cible</span></span><span class="state">planifié</span></div>
+
+  <div class="callout">La seule différence technique documentée entre <code>staging</code> et <code>ci</code> : <code>system_security_ufw_enabled: true</code> en staging, <code>false</code> en CI (un runner jetable n'a pas besoin d'un pare-feu qui pourrait couper sa propre connexion SSH). Tout le reste — les cinq rôles, l'ordre, la logique — est <b>identique</b>.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>C'est ta réponse à « avez-vous testé ça ailleurs qu'en local ? » avant même qu'on la pose. Le runner CI n'est pas un décor : c'est un second environnement réel, qui a révélé deux des quatre bugs racontés dans cette présentation.</p>
+    <p class="q">Si on demande pourquoi <code>prod</code> n'existe pas encore : contrainte du VPS mutualisé (slide 5) — Nginx y entrerait en conflit avec Traefik déjà en place pour d'autres projets. La structure à trois inventaires anticipe ce jour, elle ne le simule pas.</p>
+  </div>
+</section>
+
+<!-- 19 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Démo : reconstruction" data-ci="running">
+  <div class="eyebrow"><span class="num">18</span> Démonstration</div>
+  <h1>Détruire,<br>puis reconstruire</h1>
+  <p class="lede">La preuve la plus directe qu'il n'y a plus de secret dans une tête : une machine vraiment vierge, un service qui répond, en une commande.</p>
+
+<pre><span class="c">$ multipass launch 24.04 --name logichain-staging --memory 2G --disk 10G --cloud-init cloud-init.yaml</span>
+<span class="c">$ ansible-playbook site.yml -i inventories/staging</span>
+<span class="c"># ... 72 tâches, 5 rôles ...</span>
+PLAY RECAP
+logichain-staging          : ok=72   changed=54   unreachable=0    failed=0    skipped=0
+
+<span class="c">$ script -q /dev/null ansible-playbook site.yml</span>
+script -q /dev/null ansible-playbook site.yml  4.14s user 3.04s system 7% cpu <span class="s">1:36.23</span> total</pre>
+
+  <div class="cols c3" style="margin-top:22px">
+    <div class="stat"><span class="n signal">1:36</span><span class="l">reconstruction complète</span></div>
+    <div class="stat"><span class="n app">200</span><span class="l"><code>/health</code> après coup</span></div>
+    <div class="stat"><span class="n ok">401</span><span class="l">login avec des identifiants inexistants</span></div>
+  </div>
+
+  <div class="callout">Le second code HTTP compte autant que le premier : un <b>401</b> et pas un 500 ou un timeout prouve que MongoDB est réellement interrogé, pas seulement que Node.js a démarré. Journal complet, mesuré le 2026-09-08 : <code>soutenance/preuves/rebuild-2026-09-08.log</code>.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Si le temps le permet, lance réellement <code>multipass launch</code> en direct avant la slide (ça prend le temps de ton intro) et affiche le résultat ici — sinon, la capture réelle suffit, elle est datée et vérifiable.</p>
+    <p>Insiste sur la méthode de mesure : <code>script -q /dev/null</code> plutôt que <code>time</code> seul, pour conserver l'intégralité de la sortie (couleurs comprises) comme preuve, tout en obtenant un total fiable au pied du journal.</p>
+    <p class="q">Si on demande « avez-vous rejoué cette démonstration récemment ? » : la reconstruction complète depuis une VM détruite n'a pas été rejouée une seconde fois pour ce Runbook — ça aurait détruit l'environnement de démo actif. Ce qui a été revérifié le même jour, sur la VM existante déjà provisionnée : un nouveau passage de <code>site.yml</code> en non-régression, résultat attendu <code>changed=0, failed=0</code> — confirmé.</p>
+  </div>
+</section>
+
+<!-- 20 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="CI" data-ci="green">
+  <div class="eyebrow"><span class="num">19</span> Intégration continue</div>
+  <h1>Trois pipelines CI,<br>un par dépôt</h1>
+
+  <table>
+    <tr><th>Dépôt</th><th>Déclenchement</th><th>Ce qui est vérifié</th></tr>
+    <tr><td><code>logichain-infra</code></td><td>PR/push vers <code>develop</code>, <code>main</code></td><td>yamllint · ansible-lint · <code>--syntax-check</code> · gitleaks</td></tr>
+    <tr><td><code>logichain-api</code></td><td>PR/push vers <code>develop</code>, <code>main</code></td><td>Qualité et tests · gitleaks</td></tr>
+    <tr><td><code>LogiChainMobile</code></td><td>PR/push vers <code>develop</code>, <code>main</code></td><td>Qualité et tests · gitleaks</td></tr>
+  </table>
+
+  <div class="cols c2" style="margin-top:22px">
+    <div class="card">
+      <h3>Le check qui compte : <code>Lint et secrets</code></h3>
+      <p>Nom exact du job dans <code>ci.yml</code> — il doit correspondre au nom déclaré dans les rulesets, sinon la Pull Request reste bloquée en attente d'un check qui ne se déclenchera jamais. La syntaxe est vérifiée contre l'inventaire <code>ci</code>, vault déchiffré au préalable.</p>
+    </div>
+    <div class="card hi">
+      <h3>Effet de bord mesuré côté API</h3>
+      <p>La CI de <code>logichain-api</code> a fait remonter sa couverture de tests de <b>32,5 % à 95,8 %</b> sur <code>src/services</code>, à seuils inchangés (70/65/70/70), et son nombre de tests de <b>65 à 71</b> — conséquence directe d'avoir dû rendre le pipeline exigeant sur ce module.</p>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Les quatre pipelines verts (3 CI + 1 CD, slide suivante) sont ton indicateur global de santé du projet — mentionne-le en une phrase avant d'entrer dans le détail de la CD.</p>
+    <p class="q">Si on demande le détail de « Qualité et tests » côté API/Mobile : hors périmètre de ce dépôt <code>logichain-infra</code>, détaillé respectivement en MP3 et MP4. Ce que ce module vérifie, c'est que le check requis existe et bloque réellement — vu à la slide 8.</p>
+  </div>
+</section>
+
+<!-- 21 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="CD" data-ci="failed">
+  <div class="eyebrow"><span class="num">20</span> Déploiement continu</div>
+  <h1>Le runner GitHub,<br>machine vierge à chaque run</h1>
+  <p class="lede">Le VPS mutualisé n'est pas joignable depuis un runner GitHub, et la VM Multipass est locale. Le runner devient donc lui-même la cible : Ubuntu 24.04 neuf, provisionné complet, à chaque fusion sur <code>main</code>.</p>
+
+  <div class="flow">
+    <div class="step"><span class="i">1</span><span class="t"><b>Provisionner</b><span><code>ansible-playbook site.yml -i inventories/ci</code> sur le runner tout juste alloué</span></span></div>
+    <div class="step"><span class="i">2</span><span class="t"><b>Rejouer</b><span>second passage — vérification d'idempotence automatique (slide 22)</span></span></div>
+    <div class="step"><span class="i">3</span><span class="t"><b>Tests de fumée</b><span><code>/health</code> en direct, <code>/health</code> via Nginx/TLS, authentification refusée en 401</span></span></div>
+  </div>
+
+  <div class="callout bug"><b>Le bug qui n'apparaissait qu'une fois sur deux.</b> Le filtre Jinja2 <code>urlencode</code> ne protège pas le caractère « / » — il le traite comme un séparateur d'URL légitime. Or « / » coupe une URI MongoDB : le pilote refuse la connexion avec <code>MongoParseError: Password contains unescaped characters</code>. Le mot de passe étant généré aléatoirement, le bug n'apparaissait que si ce mot de passe contenait un « / » — environ une fois sur deux. Celui de staging n'en avait pas ; celui du runner CI, si. <b>Sans ce second environnement, le bug serait resté latent.</b> Corrigé par <code>| urlencode | regex_replace('/', '%2F')</code>.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>C'est le bug le plus instructif de toute la soutenance : il ne parle pas de code cassé, il parle de <b>hasard</b> — un mot de passe aléatoire qui contient ou non un caractère piège. Assume-le comme un argument en faveur du multi-environnement, pas comme une honte.</p>
+    <p><b>Provisionnement mesuré sur le runner : 4 min 35 s</b> — plus long qu'en local (1 min 36) parce que le runner part encore plus vierge (aucun paquet en cache APT, contrairement à la VM Multipass réutilisée).</p>
+    <p class="q">Si on demande « le CD déploie-t-il en production réelle ? » : non, assume-le explicitement — c'est une limite documentée (slide 26). Le runner est une machine vierge de démonstration, plus exigeante qu'un serveur permanent puisque tout est refait à chaque fusion, mais ce n'est pas encore un déploiement en production.</p>
+  </div>
+</section>
+
+<!-- 22 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Idempotence vérifiée" data-ci="green">
+  <div class="eyebrow"><span class="num">21</span> Vérification automatique</div>
+  <h1><code>changed=0</code>,<br>ou le pipeline échoue</h1>
+  <p class="lede">L'idempotence n'est pas seulement mesurée une fois pour la soutenance : elle est <b>recontrôlée à chaque fusion</b> sur <code>main</code>, automatiquement.</p>
+
+<pre><span class="k">- name:</span> Vérifier l'idempotence
+  run: |
+    set -o pipefail
+    ansible-playbook site.yml -i inventories/ci | tee run2.log
+
+    changed=$(grep -oE 'changed=[0-9]+' ...)
+    failed=$(grep -oE 'failed=[0-9]+' ...)
+
+    <span class="k">if</span> [ "${changed}" != "0" ] || [ "${failed}" != "0" ]; <span class="k">then</span>
+      echo "::error::Playbook non idempotent"
+      exit 1
+    <span class="k">fi</span></pre>
+
+  <div class="callout">Deux garde-fous, pas un seul. <code>set -o pipefail</code> : un échec d'<code>ansible-playbook</code> lui-même ne peut pas se glisser derrière un <code>changed=0</code> et passer inaperçu. Et l'absence de récapitulatif exploitable fait <b>échouer</b> le contrôle plutôt que de le laisser passer par défaut — la CD refuse de conclure « c'est bon » si elle ne peut pas le prouver.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Le message à faire passer : ce n'est pas Clara qui garantit l'idempotence en la mesurant une fois avant la soutenance, c'est le <b>pipeline lui-même</b> qui la garantit à chaque fusion future, sans intervention humaine.</p>
+    <p class="q">Si on demande ce qui se passe si une régression casse l'idempotence : la CD échoue avec un message explicite (<code>Playbook non idempotent — changed=X failed=Y</code>), la fusion sur <code>main</code> a déjà eu lieu (le contrôle est post-fusion, pas un check de PR — voir slide 8) mais l'échec est immédiatement visible dans l'onglet Actions, à corriger en urgence.</p>
+  </div>
+</section>
+
+<!-- 23 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Secrets" data-ci="green">
+  <div class="eyebrow"><span class="num">22</span> Sécurité</div>
+  <h1>Trois couches,<br>zéro secret en clair</h1>
+
+  <div class="cols c3">
+    <div class="card"><h3>ansible-vault</h3><p>3 variables chiffrées par environnement : <code>vault_jwt_secret</code>, <code>vault_mongodb_admin_password</code>, <code>vault_mongodb_app_password</code>. <code>.vault-pass</code> jamais committé, transmis hors dépôt.</p></div>
+    <div class="card"><h3>GitHub Secrets</h3><p><code>ANSIBLE_VAULT_PASSWORD</code>, un seul secret dépôt, consommé par <code>ci.yml</code> et <code>cd.yml</code> pour déchiffrer le vault au moment du pipeline.</p></div>
+    <div class="card"><h3>gitleaks</h3><p>Dernière étape de <code>ci.yml</code> : détection de secrets sur le diff. Le dépôt est <b>public</b> — c'est la vérification qui empêche une valeur en clair d'y atterrir un jour.</p></div>
+  </div>
+
+  <div class="callout">Défense en profondeur côté CD : chaque valeur du vault CI est enregistrée via <code>::add-mask::</code> <b>avant</b> de jouer le playbook (GitHub masque alors la chaîne dans tout le journal, y compris dans une trace d'erreur imprévue), et un filtre <code>sed</code> neutralise en plus tout fragment d'URI MongoDB (<code>mongodb://user:pass@</code> → <code>mongodb://***:***@</code>) dans les journaux de diagnostic. Deux couches, pas une seule pour les yeux.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Relie explicitement au bug de la slide CD : c'est <b>parce que</b> les mots de passe passent par une URI construite qu'un caractère mal échappé y a un effet, et c'est pour ça que le masquage des journaux est une seconde ligne de défense indépendante de l'échappement lui-même.</p>
+    <p class="q">Si on demande comment on prouve qu'aucun secret n'a jamais fuité : gitleaks tourne sur chaque Pull Request depuis la mise en place des rulesets (Tâche 13) — un secret introduit en clair bloquerait la fusion. Pour l'historique antérieur, aucune vérification rétroactive n'a été faite ; le dépôt reste public à revoir si un doute survient.</p>
+  </div>
+</section>
+
+<!-- 24 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Runbook" data-ci="green">
+  <div class="eyebrow"><span class="num">23</span> Exploitation</div>
+  <h1>Le Runbook :<br>dix sections, testées</h1>
+  <p class="lede">Pas un document théorique : chaque commande des sections 3, 4, 6, 7 et les diagnostics de la section 8 ont été <b>réellement rejoués</b> le 2026-09-08 contre la cible de référence.</p>
+
+  <div class="cols c2">
+    <ul class="clean">
+      <li><b>1. Architecture</b> — schéma de la cible, flux d'une requête</li>
+      <li><b>2. Prérequis</b></li>
+      <li><b>3. Reconstruction complète</b> — 1 min 36 s, mesurée</li>
+      <li><b>4. Déploiement applicatif seul</b> — <code>ok=13 changed=0</code> sans nouveau commit</li>
+      <li><b>5. Rollback</b> — mécanisme et son écart connu (slide 26)</li>
+    </ul>
+    <ul class="clean">
+      <li><b>6. Sauvegarde MongoDB</b> — cron, rétention, vérification réelle</li>
+      <li><b>7. Restauration</b> — procédure ciblée, mesurée (slide 25)</li>
+      <li><b>8. Incidents courants</b> — API muette, 502, mongod, certificat, disque plein, IP changée</li>
+      <li><b>9. Rotation des secrets</b> — vault, JWT, mots de passe MongoDB, avec un piège documenté</li>
+      <li><b>10. Passation</b> — revue à 1 approbation, transmission du vault, activation du hook</li>
+    </ul>
+  </div>
+
+  <div class="callout">La règle d'or affichée en tête du document : ce qui n'a <b>pas</b> pu être testé sans risquer l'environnement de démonstration (reconstruction répétée, rollback réel, rotation réelle de mot de passe) est <b>signalé explicitement</b>, avec ce qui a été vérifié à la place — jamais présenté comme testé quand il ne l'a été que par lecture de code.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>La phrase à retenir : « testé réellement » n'est écrite dans ce document que quand c'est vrai. C'est le contraire d'un Runbook théorique, et c'est ce qui le rend utilisable par quelqu'un qui n'a jamais vu le projet.</p>
+    <p class="q">Si on demande un exemple de piège documenté en section 9 : changer un mot de passe MongoDB dans le vault seul ne suffit pas — les tâches de création d'utilisateur ne rejouent qu'au tout premier amorçage (<code>when: not mongodb_bootstrap_marker...</code>). Sur une base déjà amorcée, il faut changer le mot de passe <b>en base d'abord</b>, puis dans le vault, puis redéployer — sinon l'API perd l'accès à Mongo entre les deux étapes.</p>
+  </div>
+</section>
+
+<!-- 25 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Sauvegarde" data-ci="failed">
+  <div class="eyebrow"><span class="num">24</span> Exploitation</div>
+  <h1>Sauvegarder,<br>sans exposer le mot de passe</h1>
+
+  <div class="cols c2">
+    <div class="card">
+      <h3>Ce qui tourne</h3>
+      <p><code>mongodump --archive --gzip</code>, cron root à 03h00, rétention <b>7 jours</b>. Archives sous <code>/var/backups/mongodb/</code>, <code>0700 root:root</code>.</p>
+    </div>
+    <div class="card hi">
+      <h3>Écrit sous nom temporaire</h3>
+      <p>Le dump s'écrit d'abord en <code>.tmp</code> ; <code>set -e</code> arrête le script avant le renommage si <code>mongodump</code> échoue — aucune archive tronquée ne prend jamais le nom d'une sauvegarde valide.</p>
+    </div>
+  </div>
+
+  <div class="callout bug"><b>Bug 1 — le mot de passe visible par <code>ps</code>.</b> <code>0700</code> protège le script, pas la ligne de commande du processus qu'il lance : passer le mot de passe admin en argument de <code>mongodump</code> l'exposerait à tout utilisateur local (<code>ps aux</code>). Corrigé : lu depuis un fichier de configuration (<code>--config</code>), jamais depuis <code>--password</code>.</div>
+
+  <div class="callout bug" style="margin-top:12px"><b>Bug 2 — un fichier d'état qui ment.</b> Le script écrivait <code>FAILED</code> en cas d'erreur… sauf tué par <code>SIGTERM</code> (arrêt cron, OOM killer) : sans trap explicite, bash voit dans <code>$?</code> le code de la <b>dernière commande achevée</b> avant le signal, jamais celui du signal. Une sauvegarde tuée laissait donc un <code>OK</code> périmé. Corrigé par <code>trap 'exit 143' TERM</code> et <code>trap 'exit 130' INT</code>, vus ensuite par le <code>trap EXIT</code>.</div>
+
+  <div class="callout" style="margin-top:12px"><b>Restauration testée — 0,24 s, mais ciblée.</b> Document témoin inséré, sauvegardé, supprimé, puis restauré (<code>--nsInclude=logichain.temoin</code>) et retrouvé intact. <b>Pas une restauration intégrale</b> : une seule collection, un volume de démonstration minime. Remesurée pendant la rédaction du Runbook : 0,21 s, cohérente.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Les deux bugs de cette slide sont ceux qui parlent le plus directement de sécurité opérationnelle — un attaquant local qui n'a jamais besoin de casser quoi que ce soit, juste de lancer <code>ps</code> au bon moment, et une supervision qui ferait confiance à un fichier d'état faux. Prends le temps de bien les raconter.</p>
+    <p class="q">Si on demande pourquoi ne pas juste chiffrer le fichier de config temporaire : il est supprimé par le <code>trap cleanup</code> dans tous les cas (succès ou échec), et créé avec <code>umask 077</code> — la fenêtre d'exposition est déjà minimale sans complexité supplémentaire.</p>
+    <p class="q">Si on demande pourquoi ne pas avoir testé une restauration intégrale : ça aurait écrasé les données de démonstration réelles (<code>items</code>, <code>events</code>, <code>users</code>) avec <code>--drop</code>, ou échoué sur des clés dupliquées sans <code>--drop</code>. La procédure ciblée sur une collection témoin isolée prouve le même mécanisme sans ce risque.</p>
+  </div>
+</section>
+
+<!-- 26 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Limites assumées" data-ci="green">
+  <div class="eyebrow"><span class="num">25</span> Honnêteté</div>
+  <h1>Ce que je n'ai pas fait,<br>et pourquoi</h1>
+
+  <div class="cols c3">
+    <div class="card hi"><h3>CD sur runner éphémère</h3><p>Le VPS mutualisé n'est pas joignable depuis GitHub Actions, la VM Multipass est locale. Le runner devient la cible. C'est plus exigeant qu'un déploiement classique (tout est refait à chaque fusion), mais ce n'est pas un serveur permanent.</p></div>
+    <div class="card hi"><h3>Le VPS Docker/Traefik n'est pas la cible</h3><p>Il héberge d'autres projets ; Nginx y entrerait en conflit de ports avec Traefik déjà en place. Il reste un héritage du module précédent, pas la destination du playbook.</p></div>
+    <div class="card hi"><h3><code>/docs</code> non protégée</h3><p>Le fichier <code>.env</code> généré ne définit pas d'authentification basique pour la documentation Swagger de l'API. Sans conséquence sur une VM locale injoignable ; à durcir avant toute exposition publique — la procédure est écrite dans le Runbook.</p></div>
+  </div>
+
+  <ul class="clean" style="margin-top:22px">
+    <li><b>Aucun tag Git sur <code>logichain-api</code></b> : la procédure de rollback (Runbook §5) est donc théorique en l'état — testée avec une branche réelle, jamais avec un SHA arbitraire non exposé comme réf, qui échoue (<code>couldn't find remote ref</code>). Recommandation écrite : tagger chaque release avant la mise en production réelle.</li>
+    <li><b>PM2 sans module Ansible</b> : déjà détaillé (slide 16) — chaque commande y est gardée selon sa nature, pas laissée nue.</li>
+  </ul>
+
+  <div class="callout">Aucun de ces points n'a été découvert par le jury en premier. Un périmètre tenu et documenté vaut mieux qu'un périmètre affiché comme complet et qui ne l'est pas.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Slide difficile à assumer à l'oral mais nécessaire : ne t'excuse pas, énonce ces points comme des arbitrages avec leur justification prête, exactement comme en MP3 et MP4.</p>
+    <p class="q">Si on demande laquelle de ces limites corriger en premier : les tags Git sur <code>logichain-api</code> — c'est la moins coûteuse (une commande <code>git tag</code> à chaque fusion vers <code>main</code>) et elle débloque un rollback réel, aujourd'hui purement théorique.</p>
+  </div>
+</section>
+
+<!-- 27 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Récapitulatif" data-ci="green">
+  <div class="eyebrow"><span class="num">26</span> Récapitulatif</div>
+  <h1>Quatre livrables,<br>chacun prouvé</h1>
+
+  <div class="cols c2">
+    <ul class="clean">
+      <li><b>Provisionnement reproductible</b> : 5 rôles, 3 inventaires, 1 min 36 s d'une VM vierge à un service qui répond</li>
+      <li><b>Idempotence garantie</b> : <code>changed=0</code> au second passage, revérifié automatiquement à chaque fusion</li>
+      <li><b>Gitflow et protections actives</b> : 6 rulesets, aucun acteur de contournement, push direct rejeté</li>
+    </ul>
+    <ul class="clean">
+      <li><b>4 pipelines verts</b> : 3 CI (un par dépôt) + 1 CD, sur un runner traité comme machine vierge</li>
+      <li><b>Passation documentée</b> : README, CONTRIBUTING, CODEOWNERS, Runbook en 10 sections — testé, pas seulement écrit</li>
+      <li><b>Quatre bugs réels, corrigés et racontés</b> : PM2 sur machine vierge, <code>urlencode</code> et le « / », mot de passe visible par <code>ps</code>, fichier d'état qui ment sous <code>SIGTERM</code></li>
+    </ul>
+  </div>
+
+  <div class="callout" style="margin-top:26px">Le point de départ était une app qui marche sur ma machine. Le point d'arrivée : une infrastructure qu'une autre personne peut détruire, reconstruire, et exploiter — avec les commandes exactes pour le faire, et les limites qu'elle ne trouvera pas seule.</div>
+
+  <div class="notes">
+    <h4>Conduite</h4>
+    <p>Lis les six lignes vite, le jury a besoin d'un point d'ancrage avant les questions. Termine sur la dernière phrase, en regardant le jury, pas l'écran — c'est la conclusion de tout le module.</p>
+  </div>
+</section>
+
+<!-- 28 ─────────────────────────────────────────────────────────────────── -->
+<section class="slide" data-title="Merci" data-ci="green">
+  <div class="title-slide">
+    <div class="sub">Module MP5 · Industrialisation et passation</div>
+    <h1>Merci</h1>
+    <div class="rule"></div>
+    <p class="who"><b>Clara Morin</b> · La MANU (NOVEI) · 2026<br>
+    <span style="color:var(--app)">Des questions ?</span></p>
+  </div>
+  <div class="notes">
+    <h4>Aide-mémoire pour les questions</h4>
+    <p><b>Lève les yeux.</b></p>
+    <p><b>Sigles :</b> CI = intégration continue. CD = déploiement continu. PLAY RECAP = résumé de fin d'exécution Ansible. UFW = pare-feu Ubuntu. rs0 = nom du replica set MongoDB. RBAC (si demandé, hérité du MP4) = contrôle d'accès par rôle.</p>
+    <p><b>« Pourquoi ne pas avoir tout testé en conditions réelles (rollback, rotation de secrets) ? »</b> Chacun de ces cas est documenté dans le Runbook avec, explicitement, ce qui a été vérifié à la place (mécanisme lu dans le code, ou testé sur un environnement jetable) — plutôt que de prétendre un test qui aurait risqué de casser l'environnement de démonstration partagé sans bénéfice réel.</p>
+    <p><b>« Combien de temps pour qu'une nouvelle personne devienne autonome ? »</b> Pas mesuré formellement — c'est justement l'écart entre ce module et une vraie passation avec un second contributeur. Ce qui est mesuré : chaque commande du Runbook est copiable telle quelle, sans variable à deviner.</p>
+    <p><b>« Le plus gros risque du projet aujourd'hui ? »</b> L'absence de tags Git sur <code>logichain-api</code>, qui rend le rollback théorique — et le fait que <code>required_approving_review_count</code> reste à 0 tant qu'il n'y a qu'une seule personne pour approuver.</p>
+    <p><b>« Qu'est-ce qui a le plus changé votre façon de voir l'infrastructure ? »</b> Les quatre bugs : aucun n'était visible en travaillant seule sur une seule machine familière. C'est le second environnement — le runner CI — qui les a fait apparaître. L'industrialisation, ce n'est pas seulement automatiser ce qui marche, c'est se donner les moyens de découvrir ce qui ne marche pas encore.</p>
+  </div>
+</section>
+
+</main>
+
+<div class="foot">
+  <span>LogiChain Infra · MP5 · Clara Morin</span>
+  <span class="spacer"></span>
+  <span id="slideTitle"></span>
+  <span class="idx"><span id="cur">1</span> / <span id="tot">28</span></span>
+</div>
+
+<div class="plan" id="plan">
+  <h2 style="margin-bottom:16px">Plan de la présentation</h2>
+  <div class="plan-grid" id="planGrid"></div>
+</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0;
+  var bar = document.getElementById('bar');
+  var cur = document.getElementById('cur');
+  var tot = document.getElementById('tot');
+  var title = document.getElementById('slideTitle');
+  var ciLabel = document.getElementById('ciLabel');
+  tot.textContent = slides.length;
+
+  // Le bandeau du pipeline se dérive de l'attribut data-ci de la slide
+  // courante (green|running|failed) : même logique que le bandeau réseau
+  // du MP4, appliquée à l'état du pipeline CI/CD plutôt qu'à la file
+  // d'attente hors ligne.
+  function ciText(state){
+    if (state === 'running') return '● CI en cours · run #48';
+    if (state === 'failed') return '● CI en échec · run #46';
+    return '● CI verte · deploy #47';
+  }
+
+  function show(n, dir){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s, k){ s.classList.toggle('on', k === i); });
+    var s = slides[i];
+    var ci = s.getAttribute('data-ci') || 'green';
+    document.body.setAttribute('data-ci', ci);
+    if (ciLabel) { ciLabel.textContent = ciText(ci); }
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    cur.textContent = i + 1;
+    title.textContent = s.getAttribute('data-title') || '';
+    var note = s.querySelector('.notes');
+    slides.forEach(function(x){ var n2 = x.querySelector('.notes'); if (n2) n2.classList.remove('on'); });
+    if (note) note.classList.add('on');
+    s.scrollTop = 0;
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  function next(){ show(i + 1); }
+  function prev(){ show(i - 1, 'back'); }
+
+  document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); prev(); }
+    else if (k === 'Home') { show(0); }
+    else if (k === 'End') { show(slides.length - 1); }
+    else if (k === 'n' || k === 'N') { document.body.classList.toggle('notes-on'); }
+    else if (k === 'p' || k === 'P') { document.body.classList.toggle('plan-on'); }
+    else if (k === 't' || k === 'T') { setTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+    else if (k === 'f' || k === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+    else if (k === 'Escape') { document.body.classList.remove('plan-on'); }
+  });
+
+  // Vue plan : une grille cliquable de toutes les slides.
+  var grid = document.getElementById('planGrid');
+  slides.forEach(function(s, k){
+    var b = document.createElement('button');
+    b.className = 'plan-item';
+    b.innerHTML = '<div class="n">' + String(k + 1).padStart(2, '0') + '</div>' +
+                  '<div class="t">' + (s.getAttribute('data-title') || '') + '</div>';
+    b.addEventListener('click', function(){
+      document.body.classList.remove('plan-on');
+      show(k);
+    });
+    grid.appendChild(b);
+  });
+
+  // Thème : clair par défaut (salle éclairée, vidéoprojecteur), sombre sur T.
+  var root = document.documentElement;
+  function setTheme(t){
+    root.setAttribute('data-theme', t);
+    try { localStorage.setItem('logichain-deck-theme', t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('logichain-deck-theme'); } catch (e) {}
+  setTheme(saved === 'dark' ? 'dark' : 'light');
+
+  var start = parseInt((location.hash || '#1').slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>
