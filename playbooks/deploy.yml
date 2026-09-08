@@ -1,0 +1,21 @@
+---
+# Playbook de déploiement applicatif seul.
+#
+# À la différence de site.yml (provisionnement complet, tous les rôles),
+# ce playbook ne rejoue QUE app_runtime : récupération du code, build,
+# fichier d'environnement, configuration PM2. Il suppose que system_security,
+# nodejs, database et web_proxy ont déjà été appliqués une première fois
+# (par site.yml) et que l'infrastructure sous-jacente est stable.
+#
+# C'est ce playbook que la chaîne d'intégration continue appelle à chaque
+# déploiement applicatif (poussée sur main) : plus rapide que site.yml
+# puisqu'il ne touche ni au système, ni à Node.js, ni à MongoDB, ni à Nginx.
+#
+# Vérifié idempotent (tâche 8) : deux passages successifs donnent
+# `changed=0` au second lorsqu'aucun nouveau commit n'est disponible sur
+# app_repo.
+- name: Déployer l'application LogiChain
+  hosts: logichain
+  become: true
+  roles:
+    - app_runtime

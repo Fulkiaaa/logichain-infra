@@ -1,0 +1,220 @@
+PLAY [Provisionner le serveur LogiChain] ***************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [logichain-staging]
+
+TASK [system_security : Mettre à jour le cache APT] ****************************
+ok: [logichain-staging]
+
+TASK [system_security : Installer les paquets système de base] *****************
+ok: [logichain-staging]
+
+TASK [system_security : Définir le fuseau horaire] *****************************
+ok: [logichain-staging]
+
+TASK [system_security : Créer le groupe applicatif] ****************************
+ok: [logichain-staging]
+
+TASK [system_security : Créer l'utilisateur de service non-root] ***************
+ok: [logichain-staging]
+
+TASK [system_security : Autoriser la clé SSH de l'administrateur sur le compte de service] ***
+ok: [logichain-staging]
+
+TASK [system_security : Durcir la configuration SSH] ***************************
+ok: [logichain-staging]
+
+TASK [system_security : Autoriser les ports entrants nécessaires] **************
+ok: [logichain-staging] => (item=22)
+ok: [logichain-staging] => (item=80)
+ok: [logichain-staging] => (item=443)
+
+TASK [system_security : Politique par défaut — refuser l'entrant] **************
+ok: [logichain-staging]
+
+TASK [system_security : Politique par défaut — autoriser le sortant] ***********
+ok: [logichain-staging]
+
+TASK [system_security : Activer le pare-feu] ***********************************
+ok: [logichain-staging]
+
+TASK [system_security : Configurer Fail2Ban] ***********************************
+ok: [logichain-staging]
+
+TASK [system_security : Activer Fail2Ban au démarrage] *************************
+ok: [logichain-staging]
+
+TASK [system_security : Activer les mises à jour de sécurité automatiques] *****
+ok: [logichain-staging]
+
+TASK [nodejs : Créer le répertoire des trousseaux APT] *************************
+ok: [logichain-staging]
+
+TASK [nodejs : Télécharger la clé GPG NodeSource] ******************************
+ok: [logichain-staging]
+
+TASK [nodejs : Déclarer le dépôt NodeSource] ***********************************
+ok: [logichain-staging]
+
+TASK [nodejs : Rafraîchir le cache APT si le dépôt a changé] *******************
+skipping: [logichain-staging]
+
+TASK [nodejs : Installer Node.js] **********************************************
+ok: [logichain-staging]
+
+TASK [nodejs : Installer PM2 en global] ****************************************
+ok: [logichain-staging]
+
+TASK [database : Vérifier si la base a déjà été amorcée] ***********************
+ok: [logichain-staging]
+
+TASK [database : Installer pip pour Python 3] **********************************
+ok: [logichain-staging]
+
+TASK [database : Installer pymongo 4+ pour les modules Ansible MongoDB] ********
+ok: [logichain-staging]
+
+TASK [database : Télécharger la clé GPG MongoDB] *******************************
+ok: [logichain-staging]
+
+TASK [database : Déclarer le dépôt MongoDB] ************************************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: /Users/claramorin/Cours/projet_logichain/logichain-infra/roles/database/tasks/main.yml:45:13
+
+43     types: [deb]
+44     uris: https://repo.mongodb.org/apt/ubuntu
+45     suites: "{{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }}"
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [logichain-staging]
+
+TASK [database : Rafraîchir le cache APT si le dépôt a changé] *****************
+skipping: [logichain-staging]
+
+TASK [database : Installer MongoDB] ********************************************
+ok: [logichain-staging]
+
+TASK [database : Déployer le fichier de clé interne du replica set] ************
+ok: [logichain-staging]
+
+TASK [database : Configurer mongod (phase d'amorçage, sans authentification)] ***
+skipping: [logichain-staging]
+
+TASK [database : Démarrer mongod] **********************************************
+ok: [logichain-staging]
+
+TASK [database : Appliquer les handlers en attente avant d'interroger la base] ***
+
+TASK [database : Initier le replica set] ***************************************
+skipping: [logichain-staging]
+
+TASK [database : Attendre que le nœud devienne PRIMARY] ************************
+skipping: [logichain-staging]
+
+TASK [database : Créer l'administrateur MongoDB] *******************************
+skipping: [logichain-staging]
+
+TASK [database : Créer l'utilisateur applicatif] *******************************
+skipping: [logichain-staging]
+
+TASK [database : Configurer mongod avec authentification] **********************
+ok: [logichain-staging]
+
+TASK [database : Appliquer le redémarrage avant la création des index] *********
+
+TASK [database : Attendre que mongod soit de nouveau à l'écoute après redémarrage] ***
+ok: [logichain-staging]
+
+TASK [database : Attendre que le nœud soit de nouveau PRIMARY après redémarrage] ***
+[DEPRECATION WARNING]: Importing 'to_native' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+ok: [logichain-staging]
+
+TASK [database : Marquer la base comme amorcée] ********************************
+ok: [logichain-staging]
+
+TASK [database : Créer les index applicatifs] **********************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Installer Nginx] *********************************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Créer le répertoire des certificats] *************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Générer la clé privée] ***************************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Générer le certificat auto-signé] ****************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Déployer le vhost LogiChain] *********************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Activer le vhost] ********************************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Désactiver le site par défaut] *******************************
+ok: [logichain-staging]
+
+TASK [web_proxy : Vérifier la configuration Nginx avant démarrage] *************
+ok: [logichain-staging]
+
+TASK [web_proxy : Activer Nginx au démarrage] **********************************
+ok: [logichain-staging]
+
+TASK [app_runtime : Installer le paquet acl (requis pour « become_user »)] *****
+ok: [logichain-staging]
+
+TASK [app_runtime : Créer le répertoire applicatif] ****************************
+ok: [logichain-staging]
+
+TASK [app_runtime : Récupérer le code source] **********************************
+ok: [logichain-staging]
+
+TASK [app_runtime : Créer le répertoire des journaux applicatifs] **************
+ok: [logichain-staging]
+
+TASK [app_runtime : Vérifier si le build TypeScript existe déjà] ***************
+ok: [logichain-staging]
+
+TASK [app_runtime : Installer les dépendances (complètes, nécessaires au build)] ***
+skipping: [logichain-staging]
+
+TASK [app_runtime : Compiler TypeScript] ***************************************
+skipping: [logichain-staging]
+
+TASK [app_runtime : Élaguer les dépendances de développement] ******************
+skipping: [logichain-staging]
+
+TASK [app_runtime : Déployer le fichier d'environnement] ***********************
+ok: [logichain-staging]
+
+TASK [app_runtime : Déployer la configuration PM2] *****************************
+ok: [logichain-staging]
+
+TASK [app_runtime : S'assurer que le démon PM2 est démarré] ********************
+ok: [logichain-staging]
+
+TASK [app_runtime : Lister les processus PM2 connus] ***************************
+ok: [logichain-staging]
+
+TASK [app_runtime : Démarrer l'application si elle n'est pas déjà gérée par PM2] ***
+skipping: [logichain-staging]
+
+TASK [app_runtime : Générer l'unité systemd PM2 (survie au redémarrage)] *******
+ok: [logichain-staging]
+
+TASK [app_runtime : Activer le service PM2 au démarrage] ***********************
+ok: [logichain-staging]
+
+TASK [app_runtime : Appliquer les handlers en attente avant de vérifier la santé de l'API] ***
+
+TASK [app_runtime : Attendre que l'API réponde] ********************************
+ok: [logichain-staging]
+
+PLAY RECAP *********************************************************************
+logichain-staging          : ok=54   changed=0    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0   
+
