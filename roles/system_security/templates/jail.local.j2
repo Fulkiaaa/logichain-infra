@@ -1,0 +1,10 @@
+# Géré par Ansible — rôle system_security.
+[DEFAULT]
+bantime  = {{ system_security_fail2ban_bantime }}
+findtime = 10m
+maxretry = {{ system_security_fail2ban_maxretry }}
+backend  = systemd
+
+[sshd]
+enabled = true
+port    = {{ system_security_ssh_port }}

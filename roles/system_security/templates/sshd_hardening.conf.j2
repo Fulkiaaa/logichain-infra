@@ -1,0 +1,10 @@
+# Géré par Ansible — rôle system_security. Toute modification manuelle sera écrasée.
+Port {{ system_security_ssh_port }}
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+ChallengeResponseAuthentication no
+X11Forwarding no
+MaxAuthTries 3
+ClientAliveInterval 300
+ClientAliveCountMax 2

@@ -1,0 +1,6 @@
+---
+- name: Provisionner le serveur LogiChain
+  hosts: logichain
+  become: true
+  roles:
+    - system_security

@@ -1,0 +1,20 @@
+---
+# Interface documentée du rôle : toute variable consommée ci-dessous doit avoir
+# une valeur par défaut, pour que le rôle reste jouable seul. group_vars/all
+# garde la priorité sur ces valeurs, sans risque de conflit.
+
+# Utilisateur/groupe applicatifs (normalement fournis par group_vars/all, cf. Tâche 1).
+app_user: logichain
+app_group: logichain
+
+# Clé publique SSH de l'administrateur à autoriser sur le compte de service.
+# Vide par défaut : ce rôle doit aussi pouvoir tourner sur un runner CI qui ne
+# possède pas cette clé. La valeur réelle est fournie par group_vars/all.
+system_security_admin_pubkey: ""
+
+system_security_ufw_enabled: true
+system_security_ufw_allowed_ports: ["22", "80", "443"]
+system_security_timezone: Europe/Paris
+system_security_ssh_port: 22
+system_security_fail2ban_bantime: 1h
+system_security_fail2ban_maxretry: 5

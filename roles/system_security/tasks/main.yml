@@ -1,0 +1,104 @@
+---
+- name: Mettre à jour le cache APT
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Installer les paquets système de base
+  ansible.builtin.apt:
+    name: [ufw, fail2ban, unattended-upgrades, curl, gnupg, ca-certificates]
+    state: present
+
+- name: Définir le fuseau horaire
+  community.general.timezone:
+    name: "{{ system_security_timezone }}"
+
+- name: Créer le groupe applicatif
+  ansible.builtin.group:
+    name: "{{ app_group }}"
+    state: present
+
+- name: Créer l'utilisateur de service non-root
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    group: "{{ app_group }}"
+    shell: /bin/bash
+    create_home: true
+    password: "!"          # compte sans mot de passe : accès par clé uniquement
+    state: present
+
+- name: Autoriser la clé SSH de l'administrateur sur le compte de service
+  ansible.posix.authorized_key:
+    user: "{{ app_user }}"
+    key: "{{ system_security_admin_pubkey }}"
+    state: present
+  when: system_security_admin_pubkey | length > 0
+
+# --- Durcissement SSH -------------------------------------------------------
+# validate: sshd -t refuse une config invalide AVANT écriture. Sans ce garde-fou,
+# une faute de frappe ici coupe l'accès à la machine de façon irréversible.
+- name: Durcir la configuration SSH
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-logichain.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Redémarrer sshd
+
+# --- Pare-feu ---------------------------------------------------------------
+# L'ordre ci-dessous n'est pas arbitraire : les autorisations de ports doivent
+# être posées AVANT la politique deny incoming et AVANT l'activation du pare-feu.
+# Inverser cet ordre coupe la session SSH en cours et rend la machine
+# inaccessible (il faudrait la détruire et tout recommencer).
+- name: Autoriser les ports entrants nécessaires
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ system_security_ufw_allowed_ports }}"
+  when: system_security_ufw_enabled
+
+- name: Politique par défaut — refuser l'entrant
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+  when: system_security_ufw_enabled
+
+- name: Politique par défaut — autoriser le sortant
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+  when: system_security_ufw_enabled
+
+- name: Activer le pare-feu
+  community.general.ufw:
+    state: enabled
+  when: system_security_ufw_enabled
+
+# --- Fail2Ban ---------------------------------------------------------------
+- name: Configurer Fail2Ban
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Redémarrer fail2ban
+
+- name: Activer Fail2Ban au démarrage
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Activer les mises à jour de sécurité automatiques
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    owner: root
+    group: root
+    mode: "0644"
