@@ -21,6 +21,9 @@ changed: [logichain-staging]
 TASK [system_security : Autoriser la clé SSH de l'administrateur sur le compte de service] ***
 changed: [logichain-staging]
 
+TASK [system_security : S'assurer que le répertoire de séparation de privilèges sshd existe] ***
+ok: [logichain-staging]
+
 TASK [system_security : Durcir la configuration SSH] ***************************
 changed: [logichain-staging]
 
@@ -151,6 +154,15 @@ changed: [logichain-staging]
 TASK [database : Créer les index applicatifs] **********************************
 changed: [logichain-staging]
 
+TASK [database : Créer le répertoire des sauvegardes] **************************
+changed: [logichain-staging]
+
+TASK [database : Déployer le script de sauvegarde] *****************************
+changed: [logichain-staging]
+
+TASK [database : Planifier la sauvegarde quotidienne] **************************
+changed: [logichain-staging]
+
 TASK [web_proxy : Installer Nginx] *********************************************
 changed: [logichain-staging]
 
@@ -239,6 +251,6 @@ TASK [app_runtime : Attendre que l'API réponde] *******************************
 ok: [logichain-staging]
 
 PLAY RECAP *********************************************************************
-logichain-staging          : ok=72   changed=54   unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+logichain-staging          : ok=76   changed=57   unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
 
-script -q /dev/null ansible-playbook site.yml  4.14s user 3.04s system 7% cpu 1:36.23 total
+ansible-playbook site.yml -i inventories/staging  4.31s user 3.36s system 7% cpu 1:38.14 total

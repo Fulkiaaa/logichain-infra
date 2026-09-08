@@ -21,6 +21,9 @@ ok: [logichain-staging]
 TASK [system_security : Autoriser la clé SSH de l'administrateur sur le compte de service] ***
 ok: [logichain-staging]
 
+TASK [system_security : S'assurer que le répertoire de séparation de privilèges sshd existe] ***
+ok: [logichain-staging]
+
 TASK [system_security : Durcir la configuration SSH] ***************************
 ok: [logichain-staging]
 
@@ -138,6 +141,15 @@ ok: [logichain-staging]
 TASK [database : Créer les index applicatifs] **********************************
 ok: [logichain-staging]
 
+TASK [database : Créer le répertoire des sauvegardes] **************************
+ok: [logichain-staging]
+
+TASK [database : Déployer le script de sauvegarde] *****************************
+ok: [logichain-staging]
+
+TASK [database : Planifier la sauvegarde quotidienne] **************************
+ok: [logichain-staging]
+
 TASK [web_proxy : Installer Nginx] *********************************************
 ok: [logichain-staging]
 
@@ -216,5 +228,5 @@ TASK [app_runtime : Attendre que l'API réponde] *******************************
 ok: [logichain-staging]
 
 PLAY RECAP *********************************************************************
-logichain-staging          : ok=54   changed=0    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0   
+logichain-staging          : ok=58   changed=0    unreachable=0    failed=0    skipped=11   rescued=0    ignored=0   
 
