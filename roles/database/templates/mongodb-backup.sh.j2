@@ -2,18 +2,58 @@
 # Géré par Ansible — rôle database. Sauvegarde quotidienne de {{ mongodb_database }}.
 set -euo pipefail
 
+# Tout fichier créé par ce script (config d'authentification, archive
+# temporaire, fichier d'état) est privé par défaut : la cible ne monte pas
+# /proc avec hidepid, donc la seule protection fiable est de ne jamais
+# laisser un secret ou une archive incomplète dans un fichier world-readable,
+# même l'instant d'une création.
+umask 077
+
 STAMP=$(date +%F-%H%M)
 DEST="{{ mongodb_backup_dir }}/{{ mongodb_database }}-${STAMP}.archive.gz"
+# Écrit d'abord sous un nom temporaire : si mongodump échoue en cours de
+# route (disque plein, coupure, kill), set -e arrête le script avant le
+# renommage — aucune archive tronquée ne se retrouve donc jamais sous un
+# nom final normal, indiscernable d'une sauvegarde valide.
+TMP_DEST="${DEST}.tmp"
+# Le mot de passe administrateur ne doit jamais apparaître sur la ligne de
+# commande de mongodump : tant que la cible ne monte pas /proc avec
+# hidepid, tout utilisateur local peut lire les arguments d'un processus en
+# cours (ps aux, /proc/<pid>/cmdline). mongodump le lit ici depuis un
+# fichier de configuration (--config), jamais depuis --password.
+AUTH_CONFIG="/root/.mongodump-auth.yaml"
+STATUS_FILE="{{ mongodb_backup_dir }}/.last-status"
+
+# Nettoyage et rapport d'état systématiques, y compris en cas d'échec : le
+# fichier de configuration et l'archive temporaire ne doivent jamais
+# survivre à la fin du script (succès ou non), et l'état de la dernière
+# exécution doit toujours être connaissable sans avoir à lire un journal
+# (utile en particulier pour l'exécution silencieuse via cron).
+cleanup() {
+  local rc=$?
+  rm -f "${AUTH_CONFIG}"
+  if [ "${rc}" -ne 0 ]; then
+    rm -f "${TMP_DEST}"
+    printf 'FAILED %s\n' "$(date -Is)" > "${STATUS_FILE}"
+  fi
+  exit "${rc}"
+}
+trap cleanup EXIT
+
+printf 'password: %s\n' "{{ vault_mongodb_admin_password }}" > "${AUTH_CONFIG}"
 
 mongodump \
   --username="{{ mongodb_admin_user }}" \
-  --password="{{ vault_mongodb_admin_password }}" \
+  --config="${AUTH_CONFIG}" \
   --authenticationDatabase=admin \
   --db="{{ mongodb_database }}" \
-  --archive="${DEST}" --gzip --quiet
+  --archive="${TMP_DEST}" --gzip --quiet
+
+mv "${TMP_DEST}" "${DEST}"
 
 # Purge au-delà de la rétention
 find "{{ mongodb_backup_dir }}" -name '*.archive.gz' \
      -mtime +{{ mongodb_backup_retention_days }} -delete
 
+printf 'OK %s %s\n' "$(date -Is)" "${DEST}" > "${STATUS_FILE}"
 echo "$(date -Is) sauvegarde terminée : ${DEST}"
