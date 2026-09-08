@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Hook natif de validation des messages de commit (Conventional Commits).
+#
+# Ce dépôt n'a pas de package.json (projet Ansible pur) : plutôt que d'en
+# créer un uniquement pour installer Husky, ce hook est un simple script
+# shell versionné, sans dépendance. Il applique la même règle type-enum
+# que commitlint.config.js (à faire évoluer en même temps que ce fichier).
+#
+# Activation (une fois par clone) :
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+commit_msg_file="$1"
+first_line="$(head -n1 "$commit_msg_file")"
+
+# Ignore les commits de merge et de revert (générés par git, pas par la main).
+if echo "$first_line" | grep -qE '^(Merge |Revert ")'; then
+  exit 0
+fi
+
+allowed_types="feat|fix|docs|style|refactor|test|chore|ci|build|perf"
+pattern="^(${allowed_types})(\([a-zA-Z0-9_./-]+\))?!?: .+"
+
+if ! echo "$first_line" | grep -qE "$pattern"; then
+  echo "✖ Message de commit invalide : « ${first_line} »" >&2
+  echo "  Format attendu : <type>(<portée optionnelle>): <résumé>" >&2
+  echo "  Types autorisés : ${allowed_types//|/, }" >&2
+  echo "  Voir CONTRIBUTING.md, section 3." >&2
+  exit 1
+fi
