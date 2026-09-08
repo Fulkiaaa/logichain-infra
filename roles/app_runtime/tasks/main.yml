@@ -119,6 +119,27 @@
 # daemon échoue silencieusement en « spawn /usr/bin/node EACCES » — constaté
 # en reproduisant le scénario sur la cible. {{ app_dir }} appartient à
 # app_user (mode 0750) : toujours accessible, donc un `chdir` sûr.
+#
+# Échec constaté lors de la reconstruction sur machine vierge (tâche 8) :
+# sur un compte app_user qui n'a JAMAIS invoqué PM2, la toute première
+# commande PM2 lance elle-même le démon et écrit ses messages de
+# démarrage (« [PM2] Spawning PM2 daemon… ») sur stdout, AVANT la sortie de
+# la commande demandée. `pm2 jlist` ci-dessous en aurait hérité, et son
+# stdout ne serait alors plus du JSON pur : le filtre `from_json` de la
+# tâche suivante échouerait avec « Expecting value: line 2 column 25 ».
+# Invisible en rejouant un rôle déjà appliqué incrémentalement (le démon
+# tournait déjà d'un passage précédent) ; systématique sur machine vierge.
+# `pm2 ping` est la commande documentée pour s'assurer que le démon tourne
+# avant d'invoquer une commande dont la sortie doit être analysée : sa
+# propre sortie n'est jamais parsée, donc peu importe qu'elle porte la
+# bannière de démarrage.
+- name: S'assurer que le démon PM2 est démarré
+  ansible.builtin.command:
+    cmd: pm2 ping
+    chdir: "{{ app_dir }}"
+  become_user: "{{ app_user }}"
+  changed_when: false
+
 - name: Lister les processus PM2 connus
   ansible.builtin.command:
     cmd: pm2 jlist
