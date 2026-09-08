@@ -31,6 +31,32 @@ jobs:
         run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault-pass
       - run: chmod 600 .vault-pass
 
+      # Couche 1 (protection de fond) : enregistrer chaque secret du vault CI
+      # auprès du runner via `::add-mask::`, AVANT de jouer le playbook. À
+      # partir de là, GitHub remplace ces chaînes par *** dans TOUT le journal
+      # du job, y compris dans une trace d'erreur qui les ferait fuiter sans
+      # qu'on l'ait prévu (ex. MongoParseError qui embarque un fragment
+      # d'URI). Seul ANSIBLE_VAULT_PASSWORD est un secret GitHub natif
+      # (masqué automatiquement) ; vault_jwt_secret et vault_mongodb_*_password
+      # sortent du vault au moment du playbook et ne le sont pas sans cette
+      # étape. Le script ne doit JAMAIS afficher les valeurs autrement que
+      # via `::add-mask::` (ni echo, ni set -x) : leur sortie est capturée en
+      # mémoire par Python, jamais imprimée telle quelle.
+      - name: Enregistrer les secrets du vault CI auprès du runner (masquage)
+        run: |
+          python3 - <<'PYEOF'
+          import subprocess
+          import yaml
+
+          out = subprocess.run(
+              ["ansible-vault", "view", "inventories/ci/group_vars/all/vault.yml"],
+              capture_output=True, text=True, check=True,
+          ).stdout
+          data = yaml.safe_load(out)
+          for key in ("vault_jwt_secret", "vault_mongodb_admin_password", "vault_mongodb_app_password"):
+              print(f"::add-mask::{data[key]}")
+          PYEOF
+
       # 1. Provisionnement complet sur un Ubuntu 24.04 neuf.
       - name: Provisionner
         run: ansible-playbook site.yml -i inventories/ci
@@ -40,19 +66,31 @@ jobs:
       # n'apparaît dans la sortie d'ansible-playbook ci-dessus au-delà de
       # « changed »/« failed » — les vrais journaux (PM2, systemd, ports en
       # écoute) ne sont visibles qu'en interrogeant la cible elle-même.
+      #
+      # Couche 2 (défense en profondeur, en plus du masquage dynamique
+      # ci-dessus) : toute sortie de diagnostic passe par un filtre qui
+      # neutralise le segment identifiants d'une URI MongoDB
+      # (mongodb://user:pass@ → mongodb://***:***@). `pm2 logs` est la seule
+      # source ici susceptible de contenir un tel fragment (le gestionnaire
+      # d'erreurs de l'API journalise l'objet d'erreur complet sur les 500
+      # non gérées, et un MongoParseError peut embarquer l'URI). error.log et
+      # out.log (déclarés dans ecosystem.config.js) ne sont volontairement
+      # PAS dumpés ici : constaté aux runs précédents, PM2 ne les crée jamais
+      # (« No such file or directory ») — `pm2 logs` couvre déjà le même
+      # stdout/stderr applicatif, sans le double surface de fuite.
       - name: Diagnostiquer un échec de provisionnement
         if: failure()
         run: |
+          mask_mongo_uri() {
+            sed -E 's#(mongodb(\+srv)?://)[^:/@[:space:]]*:[^@[:space:]]*@#\1***:***@#g'
+          }
+
           echo "--- pm2 status (utilisateur logichain) ---"
-          sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 status' || true
-          echo "--- pm2 logs (100 dernières lignes) ---"
-          sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 logs --nostream --lines 100' || true
+          sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 status' | mask_mongo_uri || true
+          echo "--- pm2 logs (100 dernières lignes, identifiants Mongo masqués) ---"
+          sudo -u logichain -H bash -lc 'cd /opt/logichain && pm2 logs --nostream --lines 100' 2>&1 | mask_mongo_uri || true
           echo "--- node résolu par l'utilisateur logichain ---"
           sudo -u logichain -H bash -lc 'which node; node -v; echo "PATH=$PATH"' || true
-          echo "--- logs applicatifs — error.log ---"
-          sudo tail -n 100 /opt/logichain/logs/error.log || true
-          echo "--- logs applicatifs — out.log ---"
-          sudo tail -n 100 /opt/logichain/logs/out.log || true
           echo "--- ports en écoute ---"
           sudo ss -tlnp || true
           echo "--- statut mongod ---"

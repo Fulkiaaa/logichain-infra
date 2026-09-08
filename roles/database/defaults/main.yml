@@ -20,6 +20,17 @@ mongodb_replicaset: rs0
 # et n'ont pas de valeur par défaut : le rôle doit échouer explicitement si
 # le vault n'est pas fourni, plutôt que de créer un compte avec un mot de
 # passe trivial.
+#
+# Attention pour la prochaine personne qui touche à ce fichier :
+# vault_mongodb_admin_password (staging comme CI) peut contenir un « / » —
+# c'est le cas du mot de passe de staging aujourd'hui. Ça ne pose aucun
+# problème tant qu'il n'est passé qu'à `login_password` des modules
+# community.mongodb (tasks/main.yml, ci-dessous) : ce n'est jamais interpolé
+# dans une chaîne mongodb://. Le jour où ce mot de passe finit dans une URI
+# construite en template, il devra passer par le même échappement que
+# vault_mongodb_app_password : voir roles/app_runtime/templates/env.j2
+# (`| urlencode | regex_replace('/', '%2F')`) — le filtre Jinja2 `urlencode`
+# seul laisse volontairement le « / » non échappé.
 mongodb_admin_user: logichain_admin
 mongodb_app_user: logichain_app
 
