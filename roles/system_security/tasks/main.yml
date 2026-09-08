@@ -35,6 +35,24 @@
   when: system_security_admin_pubkey | length > 0
 
 # --- Durcissement SSH -------------------------------------------------------
+# Défaut de portabilité révélé par le runner GitHub (tâche 12) : sshd exige
+# /run/sshd (séparation de privilèges) pour accepter de valider sa config,
+# y compris en lecture seule (`sshd -t`). Sur la VM Multipass, ce répertoire
+# existe déjà — créé par systemd-tmpfiles au démarrage, sshd y tournant en
+# continu depuis le premier boot. Sur le runner, /run est un tmpfs neuf à
+# chaque exécution et sshd n'a encore jamais démarré : le répertoire manque,
+# et `sshd -t -f %s` (validate: ci-dessous) échoue avant même de lire le
+# fichier généré, avec « Missing privilege separation directory: /run/sshd ».
+# Tâche idempotente d'elle-même (le module ne modifie rien si le répertoire
+# existe déjà avec les bons attributs) : aucun impact sur staging.
+- name: S'assurer que le répertoire de séparation de privilèges sshd existe
+  ansible.builtin.file:
+    path: /run/sshd
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 # validate: sshd -t refuse une config invalide AVANT écriture. Sans ce garde-fou,
 # une faute de frappe ici coupe l'accès à la machine de façon irréversible.
 - name: Durcir la configuration SSH
