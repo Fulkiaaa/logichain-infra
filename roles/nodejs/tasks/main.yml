@@ -1,0 +1,40 @@
+---
+- name: Créer le répertoire des trousseaux APT
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Télécharger la clé GPG NodeSource
+  ansible.builtin.get_url:
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    dest: /etc/apt/keyrings/nodesource.asc
+    mode: "0644"
+
+- name: Déclarer le dépôt NodeSource
+  ansible.builtin.deb822_repository:
+    name: nodesource
+    types: [deb]
+    uris: "https://deb.nodesource.com/node_{{ nodejs_major_version }}.x"
+    suites: nodistro
+    components: [main]
+    signed_by: /etc/apt/keyrings/nodesource.asc
+    state: present
+  register: nodesource_repo
+
+- name: Rafraîchir le cache APT si le dépôt a changé
+  ansible.builtin.apt:
+    update_cache: true
+  when: nodesource_repo.changed
+
+- name: Installer Node.js
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+
+- name: Installer PM2 en global
+  community.general.npm:
+    name: pm2
+    version: "{{ nodejs_pm2_version if nodejs_pm2_version != 'latest' else omit }}"
+    global: true
+    state: present

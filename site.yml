@@ -4,3 +4,4 @@
   become: true
   roles:
     - system_security
+    - nodejs

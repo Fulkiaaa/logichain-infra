@@ -1,0 +1,10 @@
+---
+# Interface documentée du rôle : toute variable consommée par tasks/main.yml
+# doit avoir une valeur par défaut, pour que le rôle reste jouable seul.
+
+# Version majeure de Node.js à installer depuis le dépôt NodeSource.
+nodejs_major_version: 20
+
+# Version de PM2 installée en global via npm. "latest" laisse npm résoudre
+# la dernière version publiée (voir tasks/main.yml pour la gestion de ce cas).
+nodejs_pm2_version: latest
