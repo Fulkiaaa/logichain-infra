@@ -1,0 +1,224 @@
+---
+# --- Détection de l'amorçage --------------------------------------------
+# On ne peut pas se fier à une variable comme "mongodb_bootstrapped" : elle
+# n'est définie nulle part et serait toujours fausse, ce qui rejouerait
+# indéfiniment la phase d'amorçage (et donc jamais changed=0). On teste à la
+# place un marqueur sur disque, dans le dbPath : si les données Mongo sont
+# un jour purgées, le marqueur disparaît avec elles et l'amorçage se rejoue
+# légitimement.
+- name: Vérifier si la base a déjà été amorcée
+  ansible.builtin.stat:
+    path: /var/lib/mongodb/.ansible-bootstrapped
+  register: mongodb_bootstrap_marker
+
+# pip est nécessaire pour installer pymongo : le paquet python3-pymongo des
+# dépôts Ubuntu 24.04 (noble) est figé en version 3.11, alors que les
+# modules community.mongodb exigent pymongo 4+.
+- name: Installer pip pour Python 3
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+
+- name: Installer pymongo 4+ pour les modules Ansible MongoDB
+  ansible.builtin.pip:
+    # Contrainte de version explicite : le paquet apt python3-pymongo
+    # (3.11.0) satisferait sinon un simple `state: present` sans jamais
+    # être remplacé, puisqu'une version quelconque est déjà présente.
+    name: "pymongo>=4"
+    state: present
+    # PEP 668 : Ubuntu 24.04 marque l'interpréteur système comme
+    # « externally managed ». On l'autorise explicitement ici, faute de
+    # quoi pip refuse toute installation hors environnement virtuel.
+    break_system_packages: true
+
+- name: Télécharger la clé GPG MongoDB
+  ansible.builtin.get_url:
+    url: "https://www.mongodb.org/static/pgp/server-{{ mongodb_version }}.asc"
+    dest: /etc/apt/keyrings/mongodb.asc
+    mode: "0644"
+
+- name: Déclarer le dépôt MongoDB
+  ansible.builtin.deb822_repository:
+    name: mongodb-org
+    types: [deb]
+    uris: https://repo.mongodb.org/apt/ubuntu
+    suites: "{{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }}"
+    components: [multiverse]
+    signed_by: /etc/apt/keyrings/mongodb.asc
+    state: present
+  register: mongodb_repo
+
+- name: Rafraîchir le cache APT si le dépôt a changé
+  ansible.builtin.apt:
+    update_cache: true
+  when: mongodb_repo.changed
+
+- name: Installer MongoDB
+  ansible.builtin.apt:
+    name: mongodb-org
+    state: present
+
+# --- Fichier de clé interne du replica set -----------------------------
+# Un replica set avec authentification activée exige une authentification
+# inter-nœuds par keyFile, même à un seul membre : MongoDB refuse sinon de
+# démarrer (« security.keyFile is required when authorization is enabled
+# with replica sets »). Générée une seule fois sur la cible : /dev/null
+# comme chemin du lookup produit un contenu aléatoire à chaque évaluation
+# sans jamais l'écrire sur le contrôleur ; `force: false` fait qu'une fois
+# le fichier déployé, les évaluations suivantes de ce contenu sont ignorées
+# et la tâche ne rejoue jamais.
+- name: Déployer le fichier de clé interne du replica set
+  ansible.builtin.copy:
+    content: "{{ lookup('ansible.builtin.password', '/dev/null', length=756, chars=['ascii_letters', 'digits']) }}"
+    dest: "{{ mongodb_keyfile_path }}"
+    owner: mongodb
+    group: mongodb
+    mode: "0400"
+    force: false
+  no_log: true
+
+# --- Amorçage : sans authentification ---------------------------------------
+# Cette phase ne rejoue que si le marqueur d'amorçage est absent.
+- name: Configurer mongod (phase d'amorçage, sans authentification)
+  ansible.builtin.template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    mongodb_auth_enabled: false
+  when: not mongodb_bootstrap_marker.stat.exists
+  notify: Redémarrer mongod
+
+- name: Démarrer mongod
+  ansible.builtin.service:
+    name: mongod
+    state: started
+    enabled: true
+
+- name: Appliquer les handlers en attente avant d'interroger la base
+  ansible.builtin.meta: flush_handlers
+
+- name: Initier le replica set
+  community.mongodb.mongodb_replicaset:
+    login_host: "{{ mongodb_bind_ip }}"
+    replica_set: "{{ mongodb_replicaset }}"
+    members: ["{{ mongodb_bind_ip }}:{{ mongodb_port }}"]
+    # Le module valide par défaut qu'un replica set compte au moins 3 membres
+    # votants (haute disponibilité). Ici un seul nœud est volontaire : ce
+    # replica set à un membre n'existe pas pour la tolérance de panne mais
+    # parce que l'API exige `?replicaSet=rs0` (transactions multi-documents).
+    validate: false
+  register: rs_init
+  when: not mongodb_bootstrap_marker.stat.exists
+
+- name: Attendre que le nœud devienne PRIMARY
+  community.mongodb.mongodb_status:
+    login_host: "{{ mongodb_bind_ip }}"
+    replica_set: "{{ mongodb_replicaset }}"
+    poll: 12
+    interval: 5
+  when: not mongodb_bootstrap_marker.stat.exists
+
+# --- Utilisateurs -----------------------------------------------------------
+- name: Créer l'administrateur MongoDB
+  community.mongodb.mongodb_user:
+    login_host: "{{ mongodb_bind_ip }}"
+    replica_set: "{{ mongodb_replicaset }}"
+    database: admin
+    name: "{{ mongodb_admin_user }}"
+    password: "{{ vault_mongodb_admin_password }}"
+    roles: root
+    state: present
+  when: not mongodb_bootstrap_marker.stat.exists
+  no_log: true
+
+- name: Créer l'utilisateur applicatif
+  community.mongodb.mongodb_user:
+    login_host: "{{ mongodb_bind_ip }}"
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    login_database: admin
+    replica_set: "{{ mongodb_replicaset }}"
+    database: "{{ mongodb_database }}"
+    name: "{{ mongodb_app_user }}"
+    password: "{{ vault_mongodb_app_password }}"
+    roles: readWrite
+    state: present
+  when: not mongodb_bootstrap_marker.stat.exists
+  no_log: true
+
+# --- Verrouillage : authentification activée --------------------------------
+# Toujours joué : le contenu rendu est stable une fois l'authentification
+# activée, donc cette tâche est idempotente d'elle-même (aucun changement au
+# second passage) sans avoir besoin d'un `when`.
+- name: Configurer mongod avec authentification
+  ansible.builtin.template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    mongodb_auth_enabled: true
+  notify: Redémarrer mongod
+
+- name: Appliquer le redémarrage avant la création des index
+  ansible.builtin.meta: flush_handlers
+
+# `service: restarted` rend la main dès que systemd a émis la commande de
+# redémarrage, avant que mongod n'ait fini sa récupération et n'écoute à
+# nouveau : sans cette attente, la tâche suivante se heurte à une connexion
+# refusée.
+- name: Attendre que mongod soit de nouveau à l'écoute après redémarrage
+  ansible.builtin.wait_for:
+    host: "{{ mongodb_bind_ip }}"
+    port: "{{ mongodb_port }}"
+    state: started
+    delay: 1
+    timeout: 30
+
+# Le port qui répond ne signifie pas que le nœud a déjà retrouvé son rôle
+# PRIMARY après le redémarrage (ré-élection du replica set) : sans cette
+# attente authentifiée, la création des index échoue par intermittence avec
+# « node is not in primary or recovering state ».
+- name: Attendre que le nœud soit de nouveau PRIMARY après redémarrage
+  community.mongodb.mongodb_status:
+    login_host: "{{ mongodb_bind_ip }}"
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    login_database: admin
+    replica_set: "{{ mongodb_replicaset }}"
+    poll: 12
+    interval: 5
+  no_log: true
+
+- name: Marquer la base comme amorcée
+  ansible.builtin.copy:
+    dest: /var/lib/mongodb/.ansible-bootstrapped
+    content: "amorcé par Ansible\n"
+    mode: "0600"
+
+# --- Index initiaux ---------------------------------------------------------
+# Toujours joué : le module vérifie l'existence des index avant d'agir,
+# ce qui reste idempotent.
+- name: Créer les index applicatifs
+  community.mongodb.mongodb_index:
+    login_host: "{{ mongodb_bind_ip }}"
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    login_database: admin
+    replica_set: "{{ mongodb_replicaset }}"
+    indexes:
+      - database: "{{ mongodb_database }}"
+        collection: items
+        keys: {qrCode: 1}
+        options: {name: idx_items_qrcode, unique: true}
+        state: present
+      - database: "{{ mongodb_database }}"
+        collection: events
+        keys: {status: 1, startDate: -1}
+        options: {name: idx_events_status_start}
+        state: present
+  no_log: true

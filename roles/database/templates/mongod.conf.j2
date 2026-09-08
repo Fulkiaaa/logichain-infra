@@ -1,0 +1,19 @@
+# Géré par Ansible — rôle database. Toute modification manuelle sera écrasée.
+storage:
+  dbPath: /var/lib/mongodb
+systemLog:
+  destination: file
+  logAppend: true
+  path: /var/log/mongodb/mongod.log
+net:
+  port: {{ mongodb_port }}
+  bindIp: {{ mongodb_bind_ip }}     # jamais exposé publiquement
+replication:
+  replSetName: {{ mongodb_replicaset }}
+{% if mongodb_auth_enabled | default(false) %}
+security:
+  authorization: enabled
+  # Authentification inter-nœuds, obligatoire dès que l'autorisation est
+  # activée sur un replica set — y compris à un seul membre.
+  keyFile: {{ mongodb_keyfile_path }}
+{% endif %}

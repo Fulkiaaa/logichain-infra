@@ -1,0 +1,31 @@
+---
+# Interface documentée du rôle : toute variable consommée par tasks/main.yml
+# doit avoir une valeur par défaut, pour que le rôle reste jouable seul.
+
+# Version de MongoDB installée depuis le dépôt officiel MongoDB.
+mongodb_version: "8.0"
+
+# Adresse d'écoute de mongod : jamais autre chose que loopback, l'API se
+# connecte en local sur le même hôte.
+mongodb_bind_ip: 127.0.0.1
+mongodb_port: 27017
+
+# Base applicative et replica set attendus par l'API (MONGO_URI avec
+# ?replicaSet=rs0).
+mongodb_database: logichain
+mongodb_replicaset: rs0
+
+# Comptes MongoDB créés lors de l'amorçage. Les mots de passe associés
+# proviennent du vault (vault_mongodb_admin_password, vault_mongodb_app_password)
+# et n'ont pas de valeur par défaut : le rôle doit échouer explicitement si
+# le vault n'est pas fourni, plutôt que de créer un compte avec un mot de
+# passe trivial.
+mongodb_admin_user: logichain_admin
+mongodb_app_user: logichain_app
+
+# Fichier de clé interne du replica set. MongoDB l'exige dès que
+# `security.authorization: enabled` est combiné à `replication.replSetName`
+# — même pour un replica set à un seul membre. Généré une seule fois sur la
+# cible au premier passage (voir tasks/main.yml) : sa valeur n'a pas besoin
+# d'être connue de l'inventaire ou du vault.
+mongodb_keyfile_path: /etc/mongod.keyfile
