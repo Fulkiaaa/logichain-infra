@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Géré par Ansible — rôle database. Sauvegarde quotidienne de {{ mongodb_database }}.
+set -euo pipefail
+
+STAMP=$(date +%F-%H%M)
+DEST="{{ mongodb_backup_dir }}/{{ mongodb_database }}-${STAMP}.archive.gz"
+
+mongodump \
+  --username="{{ mongodb_admin_user }}" \
+  --password="{{ vault_mongodb_admin_password }}" \
+  --authenticationDatabase=admin \
+  --db="{{ mongodb_database }}" \
+  --archive="${DEST}" --gzip --quiet
+
+# Purge au-delà de la rétention
+find "{{ mongodb_backup_dir }}" -name '*.archive.gz' \
+     -mtime +{{ mongodb_backup_retention_days }} -delete
+
+echo "$(date -Is) sauvegarde terminée : ${DEST}"

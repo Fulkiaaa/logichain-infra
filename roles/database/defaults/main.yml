@@ -40,3 +40,12 @@ mongodb_app_user: logichain_app
 # cible au premier passage (voir tasks/main.yml) : sa valeur n'a pas besoin
 # d'être connue de l'inventaire ou du vault.
 mongodb_keyfile_path: /etc/mongod.keyfile
+
+# Sauvegarde quotidienne de {{ mongodb_database }} (mongodump --archive --gzip)
+# et purge par rétention. Le script déployé (mongodb-backup.sh.j2) contient
+# le mot de passe administrateur : voir tasks/main.yml pour le détail des
+# permissions (0700, root:root) et du no_log qui protègent ce secret.
+mongodb_backup_enabled: true
+mongodb_backup_dir: /var/backups/mongodb
+mongodb_backup_retention_days: 7
+mongodb_backup_hour: "3"
