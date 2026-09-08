@@ -2,3 +2,4 @@
 *.retry
 .env
 run*.log
+.ansible/
