@@ -1,0 +1,24 @@
+---
+# Variables du provisionnement CI/CD (voir .github/workflows/cd.yml).
+#
+# Le runner GitHub sert de machine vierge, détruite à la fin de chaque
+# exécution : ces valeurs n'ont aucune portée au-delà d'un run.
+
+# UFW désactivé : une politique « deny incoming » sur un runner risquerait de
+# couper sa connectivité (sortante vers GitHub, ou vers lui-même pour les
+# tests de fumée) en cours d'exécution. Le rôle system_security reste
+# entièrement joué (paquets, utilisateur, SSH, Fail2Ban) ; seule l'activation
+# du pare-feu est sautée.
+system_security_ufw_enabled: false
+
+# system_security_admin_pubkey n'est volontairement PAS défini ici : il garde
+# la valeur par défaut du rôle (chaîne vide). Le runner ne possède pas la clé
+# SSH de l'administrateur ; la tâche authorized_key est sautée (when: | length > 0).
+
+# server_name à "localhost" : c'est sous ce nom que les tests de fumée du
+# pipeline CD interrogent l'API via le proxy Nginx (curl -k https://localhost/...).
+web_proxy_server_name: localhost
+web_proxy_tls_mode: selfsigned
+
+# CORS ouvert : aucun client réel n'appelle cette instance jetable.
+app_cors_origin: "*"

@@ -1,0 +1,18 @@
+---
+extends: default
+ignore: |
+  # Cache local des collections Galaxy, ignoré par git : contenu de dépôts
+  # tiers, hors de notre contrôle.
+  .ansible/
+  # #cloud-config est une directive cloud-init littérale et obligatoire :
+  # ni un « ---» de début de document ni un espace après # ne peuvent lui
+  # être ajoutés sans casser cloud-init. Ce n'est pas un artefact Ansible.
+  cloud-init.yaml
+  # Contenu chiffré (ansible-vault, en-tête $ANSIBLE_VAULT) : ce n'est pas
+  # du YAML lisible, pas de sens à le linter comme tel.
+  inventories/staging/group_vars/all/vault.yml
+  inventories/ci/group_vars/all/vault.yml
+rules:
+  line-length: {max: 140}
+  truthy: {allowed-values: ["true", "false"], check-keys: false}
+  comments: {min-spaces-from-content: 1}

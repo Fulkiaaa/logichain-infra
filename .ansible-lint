@@ -1,0 +1,37 @@
+---
+# Configuration de ansible-lint pour ce dépôt.
+#
+# Les règles ci-dessous ne sont pas contournées mais explicitement acceptées :
+# ce sont des choix de conception documentés du projet (voir task-6-report.md
+# et task-7-report.md), formalisés ici comme prévu (voir progress.md, Tâche 6 :
+# « À traiter globalement en Tâche 11 »).
+
+exclude_paths:
+  # cloud-init.yaml n'est pas un artefact Ansible : #cloud-config est une
+  # directive cloud-init littérale et obligatoire, qui ne peut pas être
+  # « corrigée » (espace, en-tête de document) sans casser cloud-init.
+  - cloud-init.yaml
+  # Contenu chiffré (ansible-vault, en-tête $ANSIBLE_VAULT) : ce n'est pas du
+  # YAML lisible, pas de sens à le linter comme tel.
+  - inventories/staging/group_vars/all/vault.yml
+  - inventories/ci/group_vars/all/vault.yml
+
+skip_list:
+  # Convention assumée du projet : app_user, app_group, app_port, mongodb_*
+  # sont des variables PARTAGÉES entre plusieurs rôles (system_security,
+  # nodejs, database, web_proxy, app_runtime), répétées dans chaque
+  # defaults/main.yml pour que chaque rôle reste jouable seul (voir les
+  # commentaires en tête de chaque fichier defaults/main.yml). Les préfixer
+  # par rôle casserait ce partage volontaire.
+  - var-naming[no-role-prefix]
+
+  # become_user hérite du `become: true` posé au niveau du play (site.yml)
+  # et de `become = True` dans ansible.cfg (privilege_escalation) : ajouter
+  # un `become: true` redondant à chaque tâche n'apporte rien.
+  - partial-become[task]
+
+  # Le rafraîchissement du cache APT après déclaration d'un nouveau dépôt
+  # (NodeSource, MongoDB) doit s'exécuter immédiatement, avant la tâche
+  # d'installation suivante DANS LE MÊME RUN — un handler ne se déclenche
+  # qu'en fin de play (flush des handlers), trop tard pour ce besoin.
+  - no-handler

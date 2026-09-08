@@ -1,0 +1,52 @@
+# Pipeline d'intégration continue : lint YAML, ansible-lint, vérification de
+# syntaxe du playbook et détection de secrets.
+#
+# La vérification de syntaxe (`--syntax-check`) charge les group_vars de
+# l'inventaire ci, dont inventories/ci/group_vars/all/vault.yml est chiffré :
+# sans le mot de passe du vault, cette étape échouerait sur un fichier
+# illisible avant même d'avoir pu vérifier quoi que ce soit. Le secret
+# ANSIBLE_VAULT_PASSWORD (le même que celui utilisé par cd.yml) est donc
+# fourni à ce job également.
+---
+name: ci
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  lint:
+    name: Lint et secrets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+
+      - run: pip install ansible ansible-lint yamllint
+      - run: ansible-galaxy collection install -r requirements.yml
+
+      - name: yamllint
+        run: yamllint .
+
+      - name: ansible-lint
+        run: ansible-lint
+
+      - name: Écrire le mot de passe du vault
+        run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault-pass
+      - run: chmod 600 .vault-pass
+
+      - name: Vérification de syntaxe
+        run: ansible-playbook site.yml -i inventories/ci --syntax-check
+
+      - name: Nettoyer le mot de passe du vault
+        if: always()
+        run: rm -f .vault-pass
+
+      - name: Détection de secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
