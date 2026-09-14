@@ -597,8 +597,6 @@ error: failed to push some refs to 'https://github.com/Fulkiaaa/logichain-api.gi
     </div>
   </div>
 
-  <div class="callout bug"><b>Bug rencontré sur machine vraiment vierge.</b> <code>sshd -t</code> exige que <code>/run/sshd</code> existe pour valider une configuration, même en lecture seule. Sur la VM Multipass, ce répertoire existe déjà (sshd tourne en continu depuis le premier démarrage). Sur un runner GitHub neuf, <code>/run</code> est un tmpfs vierge et sshd n'a jamais démarré : la validation échouait avec <code>Missing privilege separation directory: /run/sshd</code>. Corrigé en créant ce répertoire explicitement avant la validation : invisible en local, systématique en CI.</div>
-
   <div class="notes">
     <h4>Conduite</h4>
     <p>C'est le premier des bugs de machine vierge que tu racontes en détail : garde-le concret, il illustre parfaitement pourquoi un second environnement (le runner CI) a une valeur qu'une seule VM familière n'a pas.</p>
